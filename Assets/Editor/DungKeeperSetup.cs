@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using UnityEditor;
 using UnityEditor.AI;
+using UnityEditor.Compilation;
 using UnityEngine;
 using UnityEngine.AI;
 using Debug = UnityEngine.Debug;
@@ -21,7 +22,25 @@ namespace DungKeeper.Editor
             if (!PullLatest())
                 return;
 
-            AssetDatabase.Refresh();
+            // If new scripts were pulled, GameManager won't exist in the current assembly yet.
+            // Wait for the recompile that Refresh triggers, then run setup.
+            var gmType = System.Type.GetType("DungKeeper.GameManager, Assembly-CSharp");
+            if (gmType != null)
+            {
+                AssetDatabase.Refresh();
+                SetupScene();
+            }
+            else
+            {
+                Debug.Log("[DungKeeperSetup] New scripts detected — waiting for recompile before setup.");
+                CompilationPipeline.compilationFinished += OnCompilationFinished;
+                AssetDatabase.Refresh();
+            }
+        }
+
+        private static void OnCompilationFinished(object _)
+        {
+            CompilationPipeline.compilationFinished -= OnCompilationFinished;
             SetupScene();
         }
 
