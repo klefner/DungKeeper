@@ -1,14 +1,17 @@
 using System.Collections;
 using UnityEngine;
-using Unity.AI.Navigation;
 
 namespace DungKeeper
 {
     /// <summary>
-    /// Temporary test-only bootstrapper. Creates a NavMesh ground plane, one visible
-    /// unit, and one visible room so the simulation can be observed in Play mode.
+    /// Temporary test-only bootstrapper. Creates a ground plane, one visible unit,
+    /// and one visible room so the simulation can be observed in Play mode.
     /// Uses RuntimeInitializeOnLoadMethod so no scene edits are required — remove
     /// this file before shipping.
+    ///
+    /// Note: No NavMesh is baked here, so the unit will not navigate. The simulation
+    /// (morale, anger, fear ticks) still runs. Bake a NavMesh in the Editor for
+    /// full movement testing.
     /// </summary>
     public sealed class TestBootstrapper : MonoBehaviour
     {
@@ -33,13 +36,6 @@ namespace DungKeeper
             GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
             ground.name = "TestGround";
             ground.transform.localScale = new Vector3(4f, 1f, 4f);
-
-            // Bake a runtime NavMesh on the ground so UnitController can navigate.
-            NavMeshSurface surface = ground.AddComponent<NavMeshSurface>();
-            surface.BuildNavMesh();
-
-            // Wait one frame for the NavMesh to register with any NavMeshAgents.
-            yield return null;
 
             // Create a visible capsule for the first unit GameManager spawned in StartNewGame.
             var allUnits = GameManager.Instance.AllUnits;
