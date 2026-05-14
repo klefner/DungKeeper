@@ -3,10 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
-using UnityEditor.AI;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.AI;
 
 namespace DungKeeper.Editor
 {
@@ -222,7 +220,7 @@ namespace DungKeeper.Editor
 
         static void EnsureNavMesh(ref bool changed)
         {
-            NavMeshBuilder.BuildNavMesh();
+            UnityEditor.AI.NavMeshBuilder.BuildNavMesh();
             Debug.Log("[DungKeeperSetup] NavMesh baked.");
             changed = true;
         }
