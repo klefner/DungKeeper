@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan for committed secrets
+        run: |
+          if grep -rE "(PLAYFAB_DEV_SECRET_KEY|unity_password|api_key\s*=\s*['\"][^'\"]+)" \
+            --include="*.cs" --include="*.json" --include="*.yaml" \
+            --exclude-dir=.github . 2>/dev/null; then
+            echo "::error::Potential secret found in source files"
+            exit 1
+          fi
+          echo "Secret scan passed."
+
+  # Unity build job — placeholder until stack is confirmed
+  # Replace with GameCI (game.ci) or Unity Cloud Build webhook when ready
+  # unity-build:
+  #   name: Unity Build
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: game-ci/unity-builder@v4
+  #       env:
+  #         UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  #         UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+  #         UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+  #       with:
+  #         targetPlatform: StandaloneWindows64

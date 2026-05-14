@@ -1,0 +1,98 @@
+# ==============================
+# Unity
+# ==============================
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]em[Pp]rofiler/
+
+# Unity auto-generated project files
+ExportedObj/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity meta files for generated files
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Unity crash reports
+sysinfo.txt
+
+# ==============================
+# Builds & Artifacts
+# ==============================
+*.apk
+*.aab
+*.unitypackage
+*.app
+*.exe
+*.x86_64
+*.x86
+
+# ==============================
+# Addressables (generated)
+# ==============================
+/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/**/[Cc]atalog*.json
+/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/**/[Cc]atalog*.hash
+/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/**/[Bb]uild[Pp]ath/
+
+# ==============================
+# Third-party SDKs (install via Package Manager, don't commit)
+# ==============================
+/[Aa]ssets/[Pp]lay[Ff]ab[Ss][Dd][Kk]/
+/[Aa]ssets/[Aa]sset[Ss]tore[Tt]ools/
+
+# ==============================
+# Secrets & Platform Config (NEVER commit)
+# ==============================
+.env
+.env.local
+.env.*.local
+secrets.json
+*_secrets.json
+google-services.json
+GoogleService-Info.plist
+*.keystore
+*.p12
+*.pem
+
+# ==============================
+# IDEs
+# ==============================
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ==============================
+# OS
+# ==============================
+.DS_Store
+.AppleDouble
+**/.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==============================
+# Node (for any tooling)
+# ==============================
+node_modules/
