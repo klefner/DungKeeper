@@ -22,10 +22,8 @@ namespace DungKeeper.Editor
             if (!PullLatest())
                 return;
 
-            // If new scripts were pulled, GameManager won't exist in the current assembly yet.
-            // Wait for the recompile that Refresh triggers, then run setup.
-            var gmType = System.Type.GetType("DungKeeper.GameManager, Assembly-CSharp");
-            if (gmType != null)
+            // If GameManager isn't compiled yet, wait for the recompile that Refresh triggers.
+            if (FindGameManagerType() != null)
             {
                 AssetDatabase.Refresh();
                 SetupScene();
@@ -94,12 +92,21 @@ namespace DungKeeper.Editor
             return (process.ExitCode, output, error);
         }
 
+        private static System.Type FindGameManagerType()
+        {
+            foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
+                foreach (var t in asm.GetTypes())
+                    if (t.Name == "GameManager" && typeof(MonoBehaviour).IsAssignableFrom(t))
+                        return t;
+            return null;
+        }
+
         private static void EnsureGameManager()
         {
-            var gmType = System.Type.GetType("DungKeeper.GameManager, Assembly-CSharp");
+            var gmType = FindGameManagerType();
             if (gmType == null)
             {
-                Debug.LogError("[DungKeeperSetup] Could not find GameManager type. Is the script compiled?");
+                Debug.LogWarning("[DungKeeperSetup] GameManager not compiled yet — run Setup Scene again once Unity finishes compiling.");
                 return;
             }
 
