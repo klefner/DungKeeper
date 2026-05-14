@@ -223,7 +223,7 @@ namespace DungKeeper
                 controller = roomGO.AddComponent<RoomController>();
 
             // Create runtime RoomData from the ScriptableObject archetype.
-            RoomData data = definition.CreateInstance();
+            RoomData data = definition.CreateRoomData();
 
             controller.Initialize(data, definition);
             _grid[gridPos] = controller;

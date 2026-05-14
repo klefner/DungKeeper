@@ -136,7 +136,7 @@ namespace DungKeeper
         /// Creates a new <see cref="RoomData"/> instance initialised from this archetype.
         /// </summary>
         /// <param name="customName">Optional display name override; falls back to <see cref="DisplayName"/>.</param>
-        public RoomData CreateInstance(string customName = null)
+        public RoomData CreateRoomData(string customName = null)
         {
             string resolvedName = string.IsNullOrWhiteSpace(customName) ? _displayName : customName;
             return RoomData.Create(resolvedName, _roomType, _maxCapacity, _baseProductionRate, _maxHealth);

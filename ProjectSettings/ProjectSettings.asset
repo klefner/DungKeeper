@@ -372,3 +372,4 @@ PlayerSettings:
   androidShowActivityIndicatorOnLoading: -1
   m_BuildTargetGraphicsJobs: []
   m_BuildTargetGraphicsJobsMode: []
+  activeInputHandler: 0

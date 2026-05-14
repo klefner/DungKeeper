@@ -14,28 +14,28 @@ namespace DungKeeper
     public sealed class SlapResult
     {
         /// <summary>Discrete behavioural response the unit settled on.</summary>
-        public SlapResponse Response           { get; init; }
+        public SlapResponse Response           { get; private set; }
 
         /// <summary>Unit's fear value after the slap is processed.</summary>
-        public float NewFear                  { get; init; }
+        public float NewFear                  { get; private set; }
 
         /// <summary>Unit's anger value after the slap is processed.</summary>
-        public float NewAnger                 { get; init; }
+        public float NewAnger                 { get; private set; }
 
         /// <summary>Unit's loyalty value after the slap is processed.</summary>
-        public float NewLoyalty               { get; init; }
+        public float NewLoyalty               { get; private set; }
 
         /// <summary>
         /// Signed productivity multiplier delta applied immediately.
         /// Positive means faster work; negative means slowdown / disruption.
         /// </summary>
-        public float ProductivityModifier     { get; init; }
+        public float ProductivityModifier     { get; private set; }
 
         /// <summary>How long (seconds) the productivity modifier persists.</summary>
-        public float Duration                 { get; init; }
+        public float Duration                 { get; private set; }
 
         /// <summary>Human-readable UI message describing the outcome.</summary>
-        public string FeedbackMessage         { get; init; }
+        public string FeedbackMessage         { get; private set; }
     }
 
     // =========================================================================

@@ -1,9 +1,6 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
-#if TMP_PRESENT || UNITY_2023_2_OR_NEWER
-using TMPro;
-#endif
 
 namespace DungKeeper
 {
@@ -81,11 +78,7 @@ namespace DungKeeper
         // -------------------------------------------------------------------------
 
         [Header("Slap Feedback")]
-#if TMP_PRESENT || UNITY_2023_2_OR_NEWER
-        [SerializeField] private TextMeshProUGUI _slapFeedbackText;
-#else
-        [SerializeField] private Text _slapFeedbackText;
-#endif
+        [SerializeField] private Text            _slapFeedbackText;
         [SerializeField] private RectTransform   _slapFeedbackAnchor;
 
         // -------------------------------------------------------------------------

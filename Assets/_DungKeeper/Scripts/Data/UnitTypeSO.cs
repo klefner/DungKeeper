@@ -128,7 +128,7 @@ namespace DungKeeper
         /// <see cref="DisplayName"/> is used verbatim.
         /// </param>
         /// <returns>A freshly created, fully initialised <see cref="UnitData"/>.</returns>
-        public UnitData CreateInstance(string customName = null)
+        public UnitData CreateUnitData(string customName = null)
         {
             string resolvedName = string.IsNullOrWhiteSpace(customName) ? _displayName : customName;
 
