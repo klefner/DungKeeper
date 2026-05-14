@@ -173,7 +173,7 @@ namespace DungKeeper
             if (unit == null)    throw new ArgumentNullException(nameof(unit));
             if (settings == null) throw new ArgumentNullException(nameof(settings));
 
-            float now = Environment.TickCount64 / 1000f; // monotonic wall-clock seconds
+            float now = (float)Environment.TickCount / 1000f; // monotonic wall-clock seconds
 
             // ----------------------------------------------------------------
             // 1. Cooldown check — too recent?

@@ -150,7 +150,7 @@ namespace DungKeeper
         /// tests for determinism.
         /// </summary>
         public Func<float> GameTimeClock { get; set; }
-            = static () => Environment.TickCount64 / 1000f;
+            = static () => (float)Environment.TickCount / 1000f;
 
         // ------------------------------------------------------------------ //
         // Construction
@@ -395,7 +395,7 @@ namespace DungKeeper
             unchecked
             {
                 int hash = (unit.Id?.GetHashCode() ?? 0)
-                           ^ (unit.SlapCount * 2654435761)
+                           ^ (unit.SlapCount * -1640531527)
                            ^ ((int)unit.Anger);
                 return Math.Abs(hash % 1000) / 1000f;
             }

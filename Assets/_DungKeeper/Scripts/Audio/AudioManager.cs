@@ -104,7 +104,6 @@ namespace DungKeeper
         // Runtime state
         // -------------------------------------------------------------------------
 
-        private int       _currentTrackIndex = -1;
         private Coroutine _trackSequenceCoroutine;
         private Coroutine _crossFadeCoroutine;
 

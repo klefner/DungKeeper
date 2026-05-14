@@ -140,7 +140,7 @@ namespace DungKeeper
             if (_currentHealth <= 0f)
             {
                 // Room is structurally destroyed — notify manager for grid cleanup.
-                RoomManager manager = FindObjectOfType<RoomManager>();
+                RoomManager manager = Object.FindFirstObjectByType<RoomManager>();
                 if (manager != null)
                     manager.NotifyRoomDestroyed(this);
                 else
