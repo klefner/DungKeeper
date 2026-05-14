@@ -20,6 +20,16 @@ namespace DungKeeper
         /// <summary>Display name shown in the dungeon UI.</summary>
         public string DisplayName { get; set; }
 
+        /// <summary>
+        /// Alias for <see cref="DisplayName"/>. Kept for compatibility with systems
+        /// that were written against the earlier thin UnitData model.
+        /// </summary>
+        public string Name
+        {
+            get => DisplayName;
+            set => DisplayName = value;
+        }
+
         /// <summary>Functional role that determines which tasks this unit can perform.</summary>
         public UnitRole Role { get; }
 
@@ -32,6 +42,16 @@ namespace DungKeeper
 
         public float MaxHealth     { get; set; }
         public float CurrentHealth { get; set; }
+
+        /// <summary>
+        /// Alias for <see cref="CurrentHealth"/> used by systems written against the
+        /// earlier thin UnitData model.
+        /// </summary>
+        public float Health
+        {
+            get => CurrentHealth;
+            set => CurrentHealth = value;
+        }
 
         // =====================================================================
         // Psychological stats  (all 0-100 unless noted)
@@ -105,6 +125,17 @@ namespace DungKeeper
         // =====================================================================
 
         public UnitState CurrentState  { get; set; }
+
+        /// <summary>
+        /// Alias for <see cref="CurrentState"/> used by systems written against the
+        /// earlier thin UnitData model.
+        /// </summary>
+        public UnitState State
+        {
+            get => CurrentState;
+            set => CurrentState = value;
+        }
+
         public TaskType  CurrentTask   { get; set; }
 
         /// <summary>ID of the <see cref="RoomData"/> this unit is currently assigned to, or null.</summary>
@@ -113,6 +144,19 @@ namespace DungKeeper
         /// <summary>Game time (seconds) at which the unit was last slapped.</summary>
         public float LastSlappedTime { get; set; }
 
+        /// <summary>
+        /// Monotonic game clock in seconds, advanced by the simulation each tick.
+        /// The SlapSystem reads this to enforce the slap cooldown window.
+        /// </summary>
+        public float GameTime { get; set; }
+
+        /// <summary>
+        /// Gold per simulation tick the unit is currently being paid.
+        /// Mercenary units use this to decide whether to quit when slapped.
+        /// Default 0 — set by the resource/payroll system when wages are assigned.
+        /// </summary>
+        public float CurrentGoldPerTick { get; set; }
+
         /// <summary>Lifetime total number of slaps received.</summary>
         public int SlapCount   { get; set; }
 
@@ -120,7 +164,26 @@ namespace DungKeeper
         public int RebelCount  { get; set; }
 
         public bool IsImprisoned { get; set; }
-        public bool IsAlive      { get; private set; }
+
+        // IsAlive is exposed as a read-only property so external systems can
+        // check it without being able to set it directly; use Kill() to mark dead.
+        private bool _isAlive;
+
+        /// <summary>
+        /// False once the unit has died. Also false if CurrentHealth is zero.
+        /// Computed alias: systems may also check State != Dead &amp;&amp; Health > 0.
+        /// </summary>
+        public bool IsAlive => _isAlive && CurrentHealth > 0f;
+
+        /// <summary>
+        /// Raw combat effectiveness.  Named <c>Attack</c> here to match the field
+        /// name used by the combat system; maps to the <see cref="CombatAbility"/> stat.
+        /// </summary>
+        public float Attack
+        {
+            get => CombatAbility;
+            set => CombatAbility = value;
+        }
 
         // =====================================================================
         // Constructor
@@ -136,7 +199,7 @@ namespace DungKeeper
             DisplayName = name ?? throw new ArgumentNullException(nameof(name));
             Role        = role;
             Personality = personality;
-            IsAlive     = true;
+            _isAlive     = true;
             CurrentState = UnitState.Idle;
             CurrentTask  = TaskType.None;
 
@@ -467,11 +530,22 @@ namespace DungKeeper
         /// </summary>
         public void Kill()
         {
-            IsAlive       = false;
+            _isAlive      = false;
             CurrentHealth = 0f;
             CurrentState  = UnitState.Dead;
             CurrentTask   = TaskType.None;
         }
+
+        // =====================================================================
+        // Factory helper
+        // =====================================================================
+
+        /// <summary>
+        /// Creates a unit with a new random GUID and the given attributes.
+        /// Matches the static factory pattern used by <see cref="UnitTypeSO"/>.
+        /// </summary>
+        public static UnitData Create(string name, UnitRole role, PersonalityTrait personality)
+            => new UnitData(name, role, personality);
 
         /// <summary>
         /// Applies a health delta (negative = damage, positive = healing).
@@ -480,7 +554,7 @@ namespace DungKeeper
         /// <returns>True if the unit died as a result.</returns>
         public bool ApplyHealthDelta(float delta)
         {
-            if (!IsAlive) return false;
+            if (!_isAlive) return false;
 
             CurrentHealth = Math.Max(0f, Math.Min(MaxHealth, CurrentHealth + delta));
             if (CurrentHealth <= 0f)

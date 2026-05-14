@@ -39,31 +39,6 @@ namespace DungKeeper
     }
 
     // =========================================================================
-    // Events
-    // =========================================================================
-
-    /// <summary>Raised every time a unit is slapped, regardless of outcome.</summary>
-    public sealed class UnitSlappedEvent
-    {
-        public UnitData Unit       { get; init; }
-        public float    SlapForce  { get; init; }
-        public SlapResult Result   { get; init; }
-    }
-
-    /// <summary>Raised when a slap causes a unit to die (Quit response).</summary>
-    public sealed class UnitDiedEvent
-    {
-        public UnitData Unit   { get; init; }
-        public string   Reason { get; init; }
-    }
-
-    /// <summary>Raised when a unit transitions into the Rebelling state.</summary>
-    public sealed class UnitRebellionStartedEvent
-    {
-        public UnitData Unit { get; init; }
-    }
-
-    // =========================================================================
     // SlapSystem
     // =========================================================================
 
@@ -136,9 +111,13 @@ namespace DungKeeper
             = new Dictionary<string, Queue<float>>(StringComparer.Ordinal);
 
         // ------------------------------------------------------------------ //
-        // Public event hooks
+        // Event bus reference
         // ------------------------------------------------------------------ //
 
+        private readonly EventBus _bus;
+
+        // Legacy C# event hooks — kept for backwards compatibility with callers
+        // that subscribe directly on the system instance rather than the bus.
         /// <summary>Fired after every completed slap interaction.</summary>
         public event Action<UnitSlappedEvent>           OnUnitSlapped;
 
@@ -147,6 +126,22 @@ namespace DungKeeper
 
         /// <summary>Fired when a Rebel response is finalised.</summary>
         public event Action<UnitRebellionStartedEvent>  OnUnitRebellionStarted;
+
+        // ------------------------------------------------------------------ //
+        // Constructor
+        // ------------------------------------------------------------------ //
+
+        /// <summary>
+        /// Creates a SlapSystem.
+        /// </summary>
+        /// <param name="bus">
+        /// Optional event bus to publish slap events on.
+        /// Defaults to <see cref="EventBus.Global"/> when null.
+        /// </param>
+        public SlapSystem(EventBus bus = null)
+        {
+            _bus = bus; // null means "use Global" — resolved at publish time
+        }
 
         // ------------------------------------------------------------------ //
         // Primary API
@@ -296,39 +291,35 @@ namespace DungKeeper
             // ----------------------------------------------------------------
             if (response == SlapResponse.Quit)
             {
-                unit.IsAlive       = false;
-                unit.CurrentState  = UnitState.Dead;
+                unit.Kill(); // sets IsAlive = false, State = Dead, Health = 0
 
-                OnUnitDied?.Invoke(new UnitDiedEvent
-                {
-                    Unit   = unit,
-                    Reason = "Slapped to the point of no return"
-                });
+                var diedEvt = new UnitDiedEvent(unit, "Slapped to the point of no return");
+                OnUnitDied?.Invoke(diedEvt);
+                (_bus ?? EventBus.Global).Publish(diedEvt);
             }
             else if (response == SlapResponse.Rebel
                      && unit.CurrentState != UnitState.Rebelling)
             {
                 unit.CurrentState = UnitState.Rebelling;
-                OnUnitRebellionStarted?.Invoke(new UnitRebellionStartedEvent { Unit = unit });
+                var rebelEvt = new UnitRebellionStartedEvent(unit);
+                OnUnitRebellionStarted?.Invoke(rebelEvt);
+                (_bus ?? EventBus.Global).Publish(rebelEvt);
             }
 
             var result = new SlapResult
             {
-                Response            = response,
-                NewFear             = newFear,
-                NewAnger            = newAnger,
-                NewLoyalty          = newLoyalty,
+                Response             = response,
+                NewFear              = newFear,
+                NewAnger             = newAnger,
+                NewLoyalty           = newLoyalty,
                 ProductivityModifier = productivityMod,
-                Duration            = duration,
-                FeedbackMessage     = message
+                Duration             = duration,
+                FeedbackMessage      = message
             };
 
-            OnUnitSlapped?.Invoke(new UnitSlappedEvent
-            {
-                Unit      = unit,
-                SlapForce = slapForce,
-                Result    = result
-            });
+            var slappedEvt = new UnitSlappedEvent(unit, slapForce, response);
+            OnUnitSlapped?.Invoke(slappedEvt);
+            (_bus ?? EventBus.Global).Publish(slappedEvt);
 
             return result;
         }

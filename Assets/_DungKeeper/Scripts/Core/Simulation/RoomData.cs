@@ -99,6 +99,44 @@ namespace DungKeeper
             ProductionRate = Math.Min(BaseProductionRate, ProductionRate + delta);
         }
 
+        /// <summary>
+        /// Applies structural damage, reducing Health and proportionally reducing ProductionRate.
+        /// Called by the strike system during sabotage.
+        /// </summary>
+        /// <param name="amount">Positive damage amount.</param>
+        public void ApplyDamage(float amount)
+        {
+            if (amount <= 0f) return;
+
+            float previousHealth = Health;
+            Health = Math.Max(0f, Health - amount);
+
+            // Scale production rate proportionally to remaining health
+            if (MaxHealth > 0f)
+            {
+                float healthRatio  = Health / MaxHealth;
+                float baseRate     = BaseProductionRate;
+                ProductionRate     = baseRate * healthRatio;
+            }
+        }
+
+        /// <summary>
+        /// Repairs structural Health and restores ProductionRate proportionally.
+        /// </summary>
+        /// <param name="amount">Positive repair amount.</param>
+        public void Repair(float amount)
+        {
+            if (amount <= 0f) return;
+
+            Health = Math.Min(MaxHealth, Health + amount);
+
+            if (MaxHealth > 0f)
+            {
+                float healthRatio = Health / MaxHealth;
+                ProductionRate    = BaseProductionRate * healthRatio;
+            }
+        }
+
         public override string ToString()
             => $"[Room {Name} | {Type} | Workers:{WorkerCount}/{Capacity} | Rate:{ProductionRate:F2}]";
     }

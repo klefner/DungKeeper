@@ -21,6 +21,13 @@ namespace DungKeeper
         /// <summary>Static ScriptableObject definition for this room type.</summary>
         public RoomTypeSO Definition { get; private set; }
 
+        /// <summary>
+        /// True when the room has positive health and is toggled on.
+        /// Used by <see cref="InvaderController"/> and <see cref="GameManager"/> to
+        /// filter out destroyed or deactivated rooms from target selection.
+        /// </summary>
+        public bool IsOperational => Data != null && Data.Health > 0f && Data.IsActive;
+
         // -------------------------------------------------------------------------
         // Inspector-assigned visual components
         // -------------------------------------------------------------------------
@@ -97,6 +104,11 @@ namespace DungKeeper
         // -------------------------------------------------------------------------
         // Public API
         // -------------------------------------------------------------------------
+
+        /// <summary>
+        /// Alias for <see cref="TakeDamage"/> used by <see cref="InvaderController"/>.
+        /// </summary>
+        public void ApplyDamage(float amount) => TakeDamage(amount);
 
         /// <summary>Apply an amount of structural damage to the room.</summary>
         public void TakeDamage(float amount)

@@ -16,7 +16,7 @@ namespace DungKeeper
 
         public UnitSlappedEvent(UnitData unit, float force, SlapResponse response)
         {
-            Unit     = unit     ?? throw new ArgumentNullException(nameof(unit));
+            Unit     = unit ?? throw new ArgumentNullException(nameof(unit));
             Force    = force;
             Response = response;
         }
@@ -25,9 +25,9 @@ namespace DungKeeper
     /// <summary>Published whenever a unit's <see cref="UnitState"/> changes.</summary>
     public sealed class UnitStateChangedEvent
     {
-        public UnitData   Unit          { get; }
-        public UnitState  PreviousState { get; }
-        public UnitState  NewState      { get; }
+        public UnitData  Unit          { get; }
+        public UnitState PreviousState { get; }
+        public UnitState NewState      { get; }
 
         public UnitStateChangedEvent(UnitData unit, UnitState previousState, UnitState newState)
         {
@@ -40,11 +40,13 @@ namespace DungKeeper
     /// <summary>Published when a unit's health reaches zero.</summary>
     public sealed class UnitDiedEvent
     {
-        public UnitData Unit { get; }
+        public UnitData Unit   { get; }
+        public string   Reason { get; }
 
-        public UnitDiedEvent(UnitData unit)
+        public UnitDiedEvent(UnitData unit, string reason = "")
         {
-            Unit = unit ?? throw new ArgumentNullException(nameof(unit));
+            Unit   = unit ?? throw new ArgumentNullException(nameof(unit));
+            Reason = reason ?? string.Empty;
         }
     }
 
@@ -52,9 +54,10 @@ namespace DungKeeper
     public sealed class UnitRebellionStartedEvent
     {
         public UnitData   Unit       { get; }
+        /// <summary>Specific form of collective action being undertaken.</summary>
         public StrikeType StrikeType { get; }
 
-        public UnitRebellionStartedEvent(UnitData unit, StrikeType strikeType)
+        public UnitRebellionStartedEvent(UnitData unit, StrikeType strikeType = StrikeType.SlowDown)
         {
             Unit       = unit ?? throw new ArgumentNullException(nameof(unit));
             StrikeType = strikeType;
@@ -72,18 +75,25 @@ namespace DungKeeper
         }
     }
 
-    /// <summary>Published whenever a tracked resource amount changes.</summary>
+    /// <summary>
+    /// Published whenever a tracked resource amount changes.
+    /// <para>
+    ///   Both <see cref="ResourceSystem"/> (via its internal event) and callers
+    ///   that need a bus-wide broadcast should publish this type.
+    /// </para>
+    /// </summary>
     public sealed class ResourceChangedEvent
     {
-        public ResourceType Type     { get; }
-        public float        Delta    { get; }
-        public float        NewTotal { get; }
+        public ResourceType Type          { get; }
+        public float        PreviousValue { get; }
+        public float        NewValue      { get; }
+        public float        Delta         => NewValue - PreviousValue;
 
-        public ResourceChangedEvent(ResourceType type, float delta, float newTotal)
+        public ResourceChangedEvent(ResourceType type, float previousValue, float newValue)
         {
-            Type     = type;
-            Delta    = delta;
-            NewTotal = newTotal;
+            Type          = type;
+            PreviousValue = previousValue;
+            NewValue      = newValue;
         }
     }
 
@@ -150,16 +160,11 @@ namespace DungKeeper
         // Internal state
         // ------------------------------------------------------------------
 
-        // Maps event type -> list of raw Delegate so we keep a single
-        // dictionary without per-type generic fields.
         private readonly Dictionary<Type, List<Delegate>> _handlers
             = new Dictionary<Type, List<Delegate>>();
 
-        // Guard against modifying the handler list while iterating (e.g.
-        // a handler that unsubscribes itself during Publish).
         private bool _isPublishing;
 
-        // Deferred operations collected while publishing.
         private readonly List<(bool subscribe, Type eventType, Delegate handler)> _pending
             = new List<(bool, Type, Delegate)>();
 
@@ -169,8 +174,7 @@ namespace DungKeeper
 
         /// <summary>
         /// Registers <paramref name="handler"/> to receive events of type <typeparamref name="T"/>.
-        /// Subscribing the same delegate instance more than once is a no-op for that extra call
-        /// (duplicate guard applied).
+        /// Subscribing the same delegate instance more than once is a no-op.
         /// </summary>
         public void Subscribe<T>(Action<T> handler)
         {
@@ -205,8 +209,8 @@ namespace DungKeeper
         /// <summary>
         /// Publishes <paramref name="evt"/> to all subscribers registered for type <typeparamref name="T"/>.
         /// Handlers are invoked synchronously in subscription order.
-        /// Exceptions thrown by individual handlers are caught, logged to
-        /// <see cref="Console.Error"/>, and do not prevent subsequent handlers from running.
+        /// Exceptions thrown by individual handlers are caught, logged, and do not
+        /// prevent subsequent handlers from running.
         /// </summary>
         public void Publish<T>(T evt)
         {
@@ -216,13 +220,9 @@ namespace DungKeeper
             if (!_handlers.TryGetValue(key, out List<Delegate> handlers) || handlers.Count == 0)
                 return;
 
-            // Snapshot so removals during iteration are safe.
-            // We still set the flag to defer add/remove from within handlers.
             _isPublishing = true;
             try
             {
-                // Iterate over a copy to allow safe mutation of the original list
-                // once _isPublishing is cleared.
                 Delegate[] snapshot = handlers.ToArray();
                 foreach (Delegate d in snapshot)
                 {
@@ -280,7 +280,6 @@ namespace DungKeeper
                 _handlers[eventType] = list;
             }
 
-            // Duplicate guard
             if (!list.Contains(handler))
                 list.Add(handler);
         }
@@ -295,7 +294,6 @@ namespace DungKeeper
         {
             if (_pending.Count == 0) return;
 
-            // Copy + clear before processing in case flushing triggers more deferred ops.
             var toProcess = new List<(bool subscribe, Type eventType, Delegate handler)>(_pending);
             _pending.Clear();
 

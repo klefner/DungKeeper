@@ -11,6 +11,20 @@ namespace DungKeeper
     /// </summary>
     public sealed class CombatSystem
     {
+        // -------------------------------------------------------------------------
+        // Singleton — set by GameManager at startup; null outside of a dungeon scene.
+        // -------------------------------------------------------------------------
+
+        /// <summary>
+        /// The active scene-level instance.  Set by <see cref="GameManager"/> when it
+        /// constructs the system; <c>null</c> outside of a dungeon scene.
+        /// </summary>
+        public static CombatSystem Instance { get; set; }
+
+        // -------------------------------------------------------------------------
+        // Fields
+        // -------------------------------------------------------------------------
+
         private readonly GameSettings _settings;
 
         // Active invader count for the current threat.
@@ -23,6 +37,35 @@ namespace DungKeeper
         public CombatSystem(GameSettings settings)
         {
             _settings = settings;
+            // Register this as the active scene instance.
+            Instance  = this;
+        }
+
+        // -------------------------------------------------------------------------
+        // Invader death notification
+        // -------------------------------------------------------------------------
+
+        /// <summary>
+        /// Called by <see cref="InvaderController.Die"/> when a scene-side invader
+        /// GameObject is destroyed.  Decrements the active invader count and checks
+        /// for threat resolution.
+        /// </summary>
+        public void OnInvaderDied(InvaderController invader)
+        {
+            if (invader == null || !_threatActive) return;
+
+            _invaderCount  = UnityEngine.Mathf.Max(0, _invaderCount - 1);
+
+            // Reduce shared health pool by a proportional share
+            float healthShare = invader.Data != null ? invader.Data.MaxHealth : 50f;
+            _invaderHealth = UnityEngine.Mathf.Max(0f, _invaderHealth - healthShare);
+
+            if (_invaderCount <= 0 || _invaderHealth <= 0f)
+            {
+                _threatActive = false;
+                UnityEngine.Debug.Log("[CombatSystem] All invaders defeated — threat resolved.");
+                EventBus.Global.Publish(new ThreatResolvedEvent(playerWon: true));
+            }
         }
 
         /// <summary>Registers a new threat incursion.</summary>
