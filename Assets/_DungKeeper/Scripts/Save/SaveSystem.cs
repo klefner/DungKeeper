@@ -108,7 +108,7 @@ namespace DungKeeper
                 Debug.Log(
                     $"[SaveSystem] Loaded slot '{slot}' " +
                     $"(version {data.Version}, saved {data.SaveTimestamp:u}, " +
-                    $"play time {data.TotalPlayTime:F0} s).");
+                    $"play time {data.GameTime:F0} s).");
 
                 return data;
             }

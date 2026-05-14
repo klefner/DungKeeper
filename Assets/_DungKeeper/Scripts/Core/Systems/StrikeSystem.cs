@@ -284,7 +284,8 @@ namespace DungKeeper
             var unitList = units as IList<UnitData> ?? new List<UnitData>(units);
             var roomList = rooms as IList<RoomData> ?? new List<RoomData>(rooms);
 
-            var toEnd = new List<string>(4);
+            var toEnd   = new List<string>(4);
+            var toStart = new List<(UnitData unit, float time)>(4);
 
             foreach (var kv in _strikes)
             {
@@ -386,7 +387,7 @@ namespace DungKeeper
                             if (partnerDied)
                             {
                                 EventBus.Global.Publish(new UnitDiedEvent(rec.FightPartner));
-                                _strikes.Remove(rec.FightPartner.Id);
+                                toEnd.Add(rec.FightPartner.Id);
                                 rec.FightPartner = null;
                             }
                         }
@@ -410,7 +411,7 @@ namespace DungKeeper
                         resources?.TrySpend(ResourceType.Gold, FullRebellionGoldDrainPerSec * deltaTime);
 
                         // Spread to adjacent low-loyalty units not already striking
-                        SpreadRebellion(unit, unitList, currentTime);
+                        SpreadRebellion(unit, unitList, currentTime, toStart);
                         break;
                 }
             }
@@ -422,6 +423,10 @@ namespace DungKeeper
                     EndStrikeImmediate(rec.Unit, rec, calmDown: true);
                 _strikes.Remove(id);
             }
+
+            // Start deferred strikes (collected during iteration to avoid modifying the dictionary mid-foreach)
+            foreach (var (u, t) in toStart)
+                StartStrike(u, StrikeType.SlowDown, t);
         }
 
         // -------------------------------------------------------------------------
@@ -522,7 +527,9 @@ namespace DungKeeper
             resources?.TrySpend(ResourceType.Gold, SabotageGoldDrain);
         }
 
-        private void SpreadRebellion(UnitData instigator, IList<UnitData> allUnits, float currentTime)
+        private void SpreadRebellion(
+            UnitData instigator, IList<UnitData> allUnits,
+            float currentTime, List<(UnitData unit, float time)> toStart)
         {
             for (int i = 0; i < allUnits.Count; i++)
             {
@@ -534,16 +541,9 @@ namespace DungKeeper
                 if (candidate.CurrentState == UnitState.Dead)    continue;
                 if (candidate.Loyalty >= RebellionContagionLoyaltyThres) continue;
 
-                // Spread with a probability proportional to how low their loyalty is
-                // and how low the instigator's morale already is.
-                float spreadChance = (1f - candidate.Loyalty / 100f) * 0.03f; // 3% max per second per tick
-                // (We approximate by checking a fixed threshold rather than using Random here
-                //  so as not to require per-system RNG injection; callers can seed if needed.)
+                // Very low loyalty — queue for spread (deferred to avoid modifying _strikes during iteration)
                 if (candidate.Loyalty < RebellionContagionLoyaltyThres * 0.5f)
-                {
-                    // Very low loyalty — always spread
-                    StartStrike(candidate, StrikeType.SlowDown, currentTime);
-                }
+                    toStart.Add((candidate, currentTime));
             }
         }
 

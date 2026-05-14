@@ -38,7 +38,8 @@ namespace DungKeeper
         private static readonly int HashIsFleeing   = Animator.StringToHash("IsFleeing");
         private static readonly int HashIsRebelling = Animator.StringToHash("IsRebelling");
         private static readonly int HashIsFighting  = Animator.StringToHash("IsFighting");
-        private static readonly int HashDead        = Animator.StringToHash("Dead");
+        private static readonly int HashDead        = Animator.StringToHash("Dead");   // trigger (Die)
+        private static readonly int HashIsDead      = Animator.StringToHash("IsDead"); // bool (SyncAnimatorState)
         private static readonly int HashSlap        = Animator.StringToHash("SlapReact");
         private static readonly int HashExcited     = Animator.StringToHash("Excited");
         private static readonly int HashAngry       = Animator.StringToHash("Angry");
@@ -310,15 +311,11 @@ namespace DungKeeper
         {
             if (Data == null || !Data.IsAlive) return;
 
-            Data.Health = Mathf.Max(0f, Data.Health - Mathf.Abs(amount));
-
+            bool died = Data.ApplyHealthDelta(-Mathf.Abs(amount));
             RefreshBodyColor();
 
-            if (Data.Health <= 0f)
-            {
-                Data.State = UnitState.Dead;
+            if (died)
                 EventBus.Global.Publish(new UnitDiedEvent(Data));
-            }
         }
 
         // ==================================================================
@@ -398,7 +395,7 @@ namespace DungKeeper
             _animator.SetBool(HashIsFleeing,   state == UnitState.Fleeing);
             _animator.SetBool(HashIsRebelling, state == UnitState.Rebelling);
             _animator.SetBool(HashIsFighting,  state == UnitState.Fighting);
-            _animator.SetBool(HashDead,        state == UnitState.Dead);
+            _animator.SetBool(HashIsDead,      state == UnitState.Dead);
 
             _lastKnownState = state;
         }

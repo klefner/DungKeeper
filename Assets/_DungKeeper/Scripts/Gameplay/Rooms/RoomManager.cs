@@ -250,11 +250,26 @@ namespace DungKeeper
             RoomData   data       = controller.Data;
             RoomTypeSO definition = controller.Definition;
 
-            // Unassign all units.
+            // Unassign all units and clear their stale room references.
             if (data != null && data.AssignedUnitIds.Count > 0)
             {
-                foreach (string unitId in data.AssignedUnitIds)
-                    Debug.Log($"[RoomManager] Unassigning unit {unitId} from demolished room {data.Name}.");
+                if (GameManager.Instance != null)
+                {
+                    foreach (string unitId in data.AssignedUnitIds)
+                    {
+                        foreach (UnitData unit in GameManager.Instance.AllUnits)
+                        {
+                            if (unit.Id == unitId)
+                            {
+                                unit.AssignedRoomId = null;
+                                unit.CurrentTask    = TaskType.None;
+                                if (unit.CurrentState == UnitState.Working)
+                                    unit.CurrentState = UnitState.Idle;
+                                break;
+                            }
+                        }
+                    }
+                }
                 data.AssignedUnitIds.Clear();
             }
 

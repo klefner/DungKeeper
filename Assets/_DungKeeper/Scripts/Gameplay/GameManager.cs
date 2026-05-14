@@ -570,29 +570,23 @@ namespace DungKeeper
 
             _gameTime = saveData.GameTime;
 
-            // Restore units. Note: the current UnitData constructor generates a new GUID —
-            // ID restoration requires an id-preserving factory to be added to UnitData.
-            // AssignedRoomId cross-references are re-established by Id after all units are loaded.
             foreach (UnitSaveData usd in saveData.Units)
             {
-                var unit = new UnitData(usd.Name, usd.Role, usd.Personality)
-                {
-                    State          = usd.State,
-                    AssignedRoomId = usd.AssignedRoomId,
-                    CurrentTask    = usd.CurrentTask,
-                    Health         = usd.Health,
-                    MaxHealth      = usd.MaxHealth,
-                    Hunger         = usd.Hunger,
-                    Fatigue        = usd.Fatigue,
-                    Morale         = usd.Morale,
-                    Fear           = usd.Fear,
-                    Anger          = usd.Anger,
-                    Loyalty        = usd.Loyalty,
-                    Productivity   = usd.Productivity,
-                    Attack         = usd.Attack,
-                    // Defense is not present in the current UnitData model;
-                    // restore when the field is added.
-                };
+                // LoadWithId preserves the original GUID so room cross-references remain valid.
+                var unit = UnitData.LoadWithId(usd.Id, usd.Name, usd.Role, usd.Personality);
+                unit.State          = usd.State;
+                unit.AssignedRoomId = usd.AssignedRoomId;
+                unit.CurrentTask    = usd.CurrentTask;
+                unit.Health         = usd.Health;
+                unit.MaxHealth      = usd.MaxHealth;
+                unit.Hunger         = usd.Hunger;
+                unit.Fatigue        = usd.Fatigue;
+                unit.Morale         = usd.Morale;
+                unit.Fear           = usd.Fear;
+                unit.Anger          = usd.Anger;
+                unit.Loyalty        = usd.Loyalty;
+                unit.Productivity   = usd.Productivity;
+                unit.Attack         = usd.Attack;
 
                 _allUnits.Add(unit);
 
@@ -638,7 +632,13 @@ namespace DungKeeper
 
                     RoomController controller = go.GetComponent<RoomController>();
                     if (controller != null)
+                    {
+                        RoomTypeSO definition = (_roomDefinitions != null && roomIndex < _roomDefinitions.Length)
+                                               ? _roomDefinitions[roomIndex]
+                                               : null;
+                        controller.Initialize(room, definition);
                         _roomControllers[room.Id] = controller;
+                    }
                 }
             }
 
@@ -695,7 +695,7 @@ namespace DungKeeper
             // SlapSystem and MoraleSystem take an EventBus for internal event dispatch.
             _slapSystem     = new SlapSystem(EventBus.Global);
             _moraleSystem   = new MoraleSystem(EventBus.Global);
-            _taskSystem     = new TaskSystem(_settings);
+            _taskSystem     = new TaskSystem();
             _resourceSystem = new ResourceSystem();
             _combatSystem   = new CombatSystem(_settings);
             _strikeSystem   = new StrikeSystem(_settings);

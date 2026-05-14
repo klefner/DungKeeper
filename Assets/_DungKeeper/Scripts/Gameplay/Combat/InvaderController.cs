@@ -225,7 +225,7 @@ namespace DungKeeper
                 _animator.SetTrigger(s_HashDie);
 
             // Notify the pure-C# combat system
-            CombatSystem.Instance?.OnInvaderDied(this);
+            CombatSystem.Instance?.OnInvaderDied(Data?.Id ?? string.Empty);
 
             // Notify scene-side listeners (UI, audio, achievements)
             EventBus.Global.Publish(new InvaderDiedEvent(this));

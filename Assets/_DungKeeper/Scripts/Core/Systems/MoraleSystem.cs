@@ -107,12 +107,6 @@ namespace DungKeeper
         private const float AngerFatigueBoost       =  0.06f;
 
         // ------------------------------------------------------------------ //
-        // Fatigue productivity impact (advisory — applied by caller)
-        // ------------------------------------------------------------------ //
-
-        private const float FatigueDistressProductivityPenalty = -0.15f;
-
-        // ------------------------------------------------------------------ //
         // Slap recency window
         // ------------------------------------------------------------------ //
 
@@ -254,11 +248,8 @@ namespace DungKeeper
             {
                 unit.Morale = Clamp(unit.Morale + MoraleFatiguePenalty * deltaTime);
                 unit.Anger  = Clamp(unit.Anger  + AngerFatigueBoost    * deltaTime);
-
-                // Productivity penalty flag (advisory; caller reads this)
-                unit.Productivity = Math.Max(
-                    0f,
-                    unit.Productivity + FatigueDistressProductivityPenalty * deltaTime);
+                // Fatigue productivity penalty is applied transiently via UnitData.GetProductivityMultiplier();
+                // mutating Productivity directly would cause permanent stat decay.
             }
 
             // ----------------------------------------------------------------
@@ -351,17 +342,18 @@ namespace DungKeeper
             // Scale per-second probability to per-tick
             float probability = BaseStrikeProbabilityPerTick * deltaTime;
 
-            if (unit.Loyalty < settings.AngerRebellionThreshold / 3f)      // low loyalty (< 30)
+            if (unit.Loyalty < settings.AngerRebellionThreshold / 3f)
                 probability *= LowLoyaltyStrikeMultiplier;
-            else if (unit.Loyalty > settings.AngerRebellionThreshold * 2f / 3f) // high loyalty (> 60)
+            else if (unit.Loyalty > settings.AngerRebellionThreshold * 2f / 3f)
                 probability *= HighLoyaltyStrikeMultiplier;
 
             if (_rng.NextDouble() > probability)
                 return; // no strike this tick
 
+            // Publish for UI/audio notification only.
+            // Actual state change and StrikeSystem registration is handled by
+            // GameManager.CheckAngerRebellionThresholds to avoid orphaned Rebelling states.
             StrikeType strike = DetermineStrikeType(unit);
-            ApplyStrikeStateEffect(unit, strike);
-
             _bus.Publish(new UnitRebellionStartedEvent(unit, strike));
         }
 
@@ -406,32 +398,6 @@ namespace DungKeeper
                            ^ (unit.SlapCount * 2654435761)
                            ^ ((int)unit.Anger);
                 return Math.Abs(hash % 1000) / 1000f;
-            }
-        }
-
-        private static void ApplyStrikeStateEffect(UnitData unit, StrikeType strike)
-        {
-            switch (strike)
-            {
-                case StrikeType.SlowDown:
-                    // Slow-down is passive; state stays as-is, productivity
-                    // penalty is applied by the caller reading unit.Productivity.
-                    // Reduce productivity slightly to signal the slow-down.
-                    unit.Productivity = Math.Max(0.1f, unit.Productivity - 0.10f);
-                    break;
-
-                case StrikeType.Walkout:
-                    // Unit abandons its room
-                    unit.AssignedRoomId = null;
-                    unit.CurrentTask    = TaskType.None;
-                    unit.CurrentState   = UnitState.Rebelling;
-                    break;
-
-                case StrikeType.Sabotage:
-                case StrikeType.FightEachOther:
-                case StrikeType.FullRebellion:
-                    unit.CurrentState = UnitState.Rebelling;
-                    break;
             }
         }
 

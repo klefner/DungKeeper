@@ -15,7 +15,7 @@ namespace DungKeeper
         // =====================================================================
 
         /// <summary>Stable unique identifier (GUID string).</summary>
-        public string Id { get; }
+        public string Id { get; private set; }
 
         /// <summary>Display name shown in the dungeon UI.</summary>
         public string DisplayName { get; set; }

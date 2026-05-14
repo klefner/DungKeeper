@@ -55,6 +55,9 @@ namespace DungKeeper
         private float _maxHealth;
         private bool  _isDamaged;
 
+        private MaterialPropertyBlock _propBlock = new MaterialPropertyBlock();
+        private static readonly int ColorId = Shader.PropertyToID("_BaseColor");
+
         // Track last-applied state to skip redundant visual updates.
         private bool _lastKnownIsActive = true;
         private bool _lastKnownIsDamaged;
@@ -71,10 +74,10 @@ namespace DungKeeper
         /// </summary>
         public void Initialize(RoomData data, RoomTypeSO definition)
         {
-            Data       = data       ?? throw new System.ArgumentNullException(nameof(data));
-            Definition = definition ?? throw new System.ArgumentNullException(nameof(definition));
+            Data       = data ?? throw new System.ArgumentNullException(nameof(data));
+            Definition = definition; // may be null — visual features degrade gracefully
 
-            _maxHealth     = definition.MaxHealth;
+            _maxHealth     = definition != null ? definition.MaxHealth : 100f;
             _currentHealth = _maxHealth;
             _isDamaged     = false;
 
@@ -207,7 +210,9 @@ namespace DungKeeper
                 foreach (Renderer r in _roomRenderers)
                 {
                     if (r == null) continue;
-                    r.material.color = targetColor;
+                    r.GetPropertyBlock(_propBlock);
+                    _propBlock.SetColor(ColorId, targetColor);
+                    r.SetPropertyBlock(_propBlock);
                 }
             }
 
@@ -231,8 +236,15 @@ namespace DungKeeper
         {
             // Apply a brief damage tint then revert to the logical color.
             if (_roomRenderers != null)
+            {
                 foreach (Renderer r in _roomRenderers)
-                    if (r != null) r.material.color = _damagedColor;
+                {
+                    if (r == null) continue;
+                    r.GetPropertyBlock(_propBlock);
+                    _propBlock.SetColor(ColorId, _damagedColor);
+                    r.SetPropertyBlock(_propBlock);
+                }
+            }
 
             if (_ambientLight != null)
                 _ambientLight.color = _damagedColor;

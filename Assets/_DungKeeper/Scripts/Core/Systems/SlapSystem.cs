@@ -14,28 +14,41 @@ namespace DungKeeper
     public sealed class SlapResult
     {
         /// <summary>Discrete behavioural response the unit settled on.</summary>
-        public SlapResponse Response           { get; private set; }
+        public SlapResponse Response           { get; }
 
         /// <summary>Unit's fear value after the slap is processed.</summary>
-        public float NewFear                  { get; private set; }
+        public float NewFear                  { get; }
 
         /// <summary>Unit's anger value after the slap is processed.</summary>
-        public float NewAnger                 { get; private set; }
+        public float NewAnger                 { get; }
 
         /// <summary>Unit's loyalty value after the slap is processed.</summary>
-        public float NewLoyalty               { get; private set; }
+        public float NewLoyalty               { get; }
 
         /// <summary>
         /// Signed productivity multiplier delta applied immediately.
         /// Positive means faster work; negative means slowdown / disruption.
         /// </summary>
-        public float ProductivityModifier     { get; private set; }
+        public float ProductivityModifier     { get; }
 
         /// <summary>How long (seconds) the productivity modifier persists.</summary>
-        public float Duration                 { get; private set; }
+        public float Duration                 { get; }
 
         /// <summary>Human-readable UI message describing the outcome.</summary>
-        public string FeedbackMessage         { get; private set; }
+        public string FeedbackMessage         { get; }
+
+        internal SlapResult(
+            SlapResponse response, float newFear, float newAnger, float newLoyalty,
+            float productivityModifier, float duration, string feedbackMessage)
+        {
+            Response             = response;
+            NewFear              = newFear;
+            NewAnger             = newAnger;
+            NewLoyalty           = newLoyalty;
+            ProductivityModifier = productivityModifier;
+            Duration             = duration;
+            FeedbackMessage      = feedbackMessage;
+        }
     }
 
     // =========================================================================
@@ -306,16 +319,7 @@ namespace DungKeeper
                 (_bus ?? EventBus.Global).Publish(rebelEvt);
             }
 
-            var result = new SlapResult
-            {
-                Response             = response,
-                NewFear              = newFear,
-                NewAnger             = newAnger,
-                NewLoyalty           = newLoyalty,
-                ProductivityModifier = productivityMod,
-                Duration             = duration,
-                FeedbackMessage      = message
-            };
+            var result = new SlapResult(response, newFear, newAnger, newLoyalty, productivityMod, duration, message);
 
             var slappedEvt = new UnitSlappedEvent(unit, slapForce, response);
             OnUnitSlapped?.Invoke(slappedEvt);
