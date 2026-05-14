@@ -53,6 +53,10 @@ namespace DungKeeper
         [Tooltip("Room prefabs indexed by (int)RoomType. Gaps are allowed (null entries = no prefab).")]
         private GameObject[] _roomPrefabs;
 
+        [SerializeField]
+        [Tooltip("RoomTypeSO definitions indexed by (int)RoomType — must match _roomPrefabs order.")]
+        private RoomTypeSO[] _roomDefinitions;
+
         [Header("Initial Spawn")]
         [SerializeField]
         [Tooltip("How many units to spawn when no save file is found.")]
@@ -352,7 +356,13 @@ namespace DungKeeper
 
                 RoomController controller = go.GetComponent<RoomController>();
                 if (controller != null)
+                {
+                    RoomTypeSO definition = (_roomDefinitions != null && roomIndex < _roomDefinitions.Length)
+                                           ? _roomDefinitions[roomIndex]
+                                           : null;
+                    controller.Initialize(data, definition);
                     _roomControllers[data.Id] = controller;
+                }
                 else
                     Debug.LogError("[GameManager] Room prefab is missing a RoomController component.");
             }

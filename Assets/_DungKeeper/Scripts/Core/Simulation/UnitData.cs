@@ -547,6 +547,14 @@ namespace DungKeeper
         public static UnitData Create(string name, UnitRole role, PersonalityTrait personality)
             => new UnitData(name, role, personality);
 
+        // Restores a unit from save data preserving its original GUID.
+        public static UnitData LoadWithId(string id, string name, UnitRole role, PersonalityTrait personality)
+        {
+            var unit = new UnitData(name, role, personality);
+            unit.Id = id;
+            return unit;
+        }
+
         /// <summary>
         /// Applies a health delta (negative = damage, positive = healing).
         /// Calls <see cref="Kill"/> automatically if health reaches zero.
