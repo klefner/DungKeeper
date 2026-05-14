@@ -23,14 +23,18 @@ namespace DungKeeper
 
         private IEnumerator Start()
         {
-            // Wait for all MonoBehaviour Start() calls to complete (including GameManager.Start).
-            yield return new WaitForEndOfFrame();
+            // Wait two seconds to ensure GameManager.Start() has completed.
+            yield return new WaitForSeconds(2f);
+
+            Debug.Log($"[TestBootstrapper] Running. GameManager found: {GameManager.Instance != null}");
 
             if (GameManager.Instance == null)
             {
                 Debug.LogError("[TestBootstrapper] GameManager not found in scene.");
                 yield break;
             }
+
+            Debug.Log($"[TestBootstrapper] Units in simulation: {GameManager.Instance.AllUnits.Count}, Rooms: {GameManager.Instance.AllRooms.Count}");
 
             // Ground plane — Plane primitive is 10x10 units; scale 4 makes it 40x40.
             GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
@@ -39,6 +43,7 @@ namespace DungKeeper
 
             // Create a visible capsule for the first unit GameManager spawned in StartNewGame.
             var allUnits = GameManager.Instance.AllUnits;
+            Debug.Log($"[TestBootstrapper] AllUnits.Count = {allUnits.Count}");
             if (allUnits.Count > 0)
             {
                 UnitData unitData = allUnits[0];
