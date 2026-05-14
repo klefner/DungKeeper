@@ -395,10 +395,9 @@ namespace DungKeeper
                 // Play slap audio with force-scaled pitch.
                 PlaySlapAudio(force, response: null);
 
-                // Camera shake (also fired by UnitController.PlaySlapReaction,
-                // but redundant calls are harmless due to the override behaviour).
-                if (CameraShake.Instance != null)
-                    CameraShake.Instance.ShakeFromSlapForce(force);
+                // Camera shake scaled to force — redundant with UnitController.PlaySlapReaction
+                // but harmless (CameraShake.Shake is additive).
+                CameraShake.Shake(Mathf.Clamp01(force / _maxSlapForce));
             }
 
             // --- Retract hand back toward cursor ---

@@ -5,41 +5,7 @@ using UnityEngine.UI;
 
 namespace DungKeeper
 {
-    // =========================================================================
-    // Supporting data type
-    // =========================================================================
-
-    /// <summary>
-    /// Describes an active or recently ended unit strike so the UI can
-    /// display context-sensitive warnings.
-    /// </summary>
-    [System.Serializable]
-    public sealed class StrikeReport
-    {
-        /// <summary>The unit initiating or leading the strike.</summary>
-        public UnitData   Instigator  { get; }
-
-        /// <summary>Form of collective action being taken.</summary>
-        public StrikeType StrikeType  { get; }
-
-        /// <summary>Human-readable description shown in the warning panel.</summary>
-        public string     Description { get; }
-
-        /// <summary>Game-time timestamp when the strike started.</summary>
-        public float      StartTime   { get; }
-
-        public StrikeReport(UnitData instigator, StrikeType strikeType, string description, float startTime)
-        {
-            Instigator  = instigator  ?? throw new System.ArgumentNullException(nameof(instigator));
-            StrikeType  = strikeType;
-            Description = description ?? string.Empty;
-            StartTime   = startTime;
-        }
-    }
-
-    // =========================================================================
-    // UIManager
-    // =========================================================================
+    // StrikeReport is defined in StrikeSystem.cs.
 
     /// <summary>
     /// Singleton MonoBehaviour that owns all heads-up-display logic.
@@ -151,10 +117,10 @@ namespace DungKeeper
 
         private void OnEnable()
         {
-            EventBus.Global.Subscribe<ResourceChangedEvent>       (OnResourceChanged);
-            EventBus.Global.Subscribe<UnitSlappedEvent>           (OnUnitSlapped);
-            EventBus.Global.Subscribe<UnitRebellionStartedEvent>  (OnUnitRebellionStarted);
-            EventBus.Global.Subscribe<ThreatSpawnedEvent>         (OnThreatSpawned);
+            EventBus.Global.Subscribe<ResourceChangedEvent>      (OnResourceChanged);
+            EventBus.Global.Subscribe<UnitSlappedEvent>          (OnUnitSlapped);
+            EventBus.Global.Subscribe<UnitRebellionStartedEvent> (OnUnitRebellionStarted);
+            EventBus.Global.Subscribe<ThreatSpawnedEvent>        (OnThreatSpawned);
         }
 
         private void OnDisable()
@@ -180,21 +146,19 @@ namespace DungKeeper
         /// <summary>Opens the unit inspection panel populated with <paramref name="unit"/>'s data.</summary>
         public void ShowUnitInspect(UnitData unit)
         {
-            if (unit == null) return;
-            if (_unitInspectPanel == null) return;
+            if (unit == null || _unitInspectPanel == null) return;
 
             _unitInspectPanel.SetActive(true);
 
-            SetText(_inspectNameText,  unit.Name);
-            SetText(_inspectStateText, unit.State.ToString());
+            SetText(_inspectNameText,    unit.Name);
+            SetText(_inspectStateText,   unit.State.ToString());
 
-            SetSlider(_inspectFearSlider,   unit.Fear,   0f, 100f);
-            SetSlider(_inspectAngerSlider,  unit.Anger,  0f, 100f);
-            SetSlider(_inspectMoraleSlider, unit.Morale, 0f, 100f);
+            SetSlider(_inspectFearSlider,    unit.Fear,    0f, 100f);
+            SetSlider(_inspectAngerSlider,   unit.Anger,   0f, 100f);
+            SetSlider(_inspectMoraleSlider,  unit.Morale,  0f, 100f);
             SetSlider(_inspectLoyaltySlider, unit.Loyalty, 0f, 100f);
 
-            string feedback = BuildInspectFeedback(unit);
-            SetText(_inspectFeedbackText, feedback);
+            SetText(_inspectFeedbackText, BuildInspectFeedback(unit));
         }
 
         /// <summary>Hides the unit inspection panel.</summary>
@@ -226,31 +190,31 @@ namespace DungKeeper
         {
             if (_slapFeedbackText == null) yield break;
 
-            // Reset position relative to anchor.
+            // Reset position to anchor.
             if (_slapFeedbackAnchor != null)
                 _slapFeedbackText.rectTransform.anchoredPosition = _slapFeedbackAnchor.anchoredPosition;
 
-            _slapFeedbackText.text    = msg;
-            _slapFeedbackText.color   = color;
+            _slapFeedbackText.text  = msg;
+            _slapFeedbackText.color = color;
             _slapFeedbackText.gameObject.SetActive(true);
 
-            const float duration  = 1.5f;
-            const float floatDist = 60f; // pixels upward
+            const float Duration  = 1.5f;
+            const float FloatDist = 60f; // pixels upward
 
             Vector2 startPos = _slapFeedbackText.rectTransform.anchoredPosition;
             float   elapsed  = 0f;
 
-            while (elapsed < duration)
+            while (elapsed < Duration)
             {
                 elapsed += Time.deltaTime;
-                float t  = elapsed / duration;
+                float t  = elapsed / Duration;
 
-                // Float upward
+                // Float upward.
                 _slapFeedbackText.rectTransform.anchoredPosition =
-                    startPos + new Vector2(0f, Mathf.Lerp(0f, floatDist, t));
+                    startPos + new Vector2(0f, Mathf.Lerp(0f, FloatDist, t));
 
-                // Fade out in the second half
-                float alpha = t < 0.5f ? 1f : Mathf.Lerp(1f, 0f, (t - 0.5f) / 0.5f);
+                // Fade out in the second half.
+                float alpha = t < 0.5f ? 1f : Mathf.Lerp(1f, 0f, (t - 0.5f) * 2f);
                 Color c = _slapFeedbackText.color;
                 c.a = alpha;
                 _slapFeedbackText.color = c;
@@ -267,8 +231,8 @@ namespace DungKeeper
         // -------------------------------------------------------------------------
 
         /// <summary>
-        /// Shows or hides the strike warning panel based on <paramref name="report"/>.
-        /// Pass null to hide the panel.
+        /// Shows or hides the strike warning panel.
+        /// Pass null to hide; pass an active <see cref="StrikeReport"/> to show details.
         /// </summary>
         public void ShowStrikeWarning(StrikeReport report)
         {
@@ -281,8 +245,11 @@ namespace DungKeeper
             }
 
             _strikeWarningPanel.SetActive(true);
+
+            string fullRebellionTag = report.FullRebellionActive ? " — FULL REBELLION!" : string.Empty;
             SetText(_strikeWarningText,
-                $"STRIKE! {report.Instigator.Name} is leading a {report.StrikeType}!\n{report.Description}");
+                $"STRIKE! {report.ActiveStrikers} unit(s) rebelling " +
+                $"({report.ProductionLoss * 100f:F0}% production lost){fullRebellionTag}");
         }
 
         // -------------------------------------------------------------------------
@@ -290,7 +257,7 @@ namespace DungKeeper
         // -------------------------------------------------------------------------
 
         /// <summary>
-        /// Shows or hides the threat warning panel based on <paramref name="level"/>.
+        /// Shows or hides the threat warning panel.
         /// Pass <see cref="ThreatLevel.None"/> to hide.
         /// </summary>
         public void ShowThreatWarning(ThreatLevel level)
@@ -311,7 +278,7 @@ namespace DungKeeper
         // Room build panel
         // -------------------------------------------------------------------------
 
-        /// <summary>Enables or disables all buttons in the build panel.</summary>
+        /// <summary>Enables or disables all room build buttons.</summary>
         public void SetRoomBuildButtonsEnabled(bool enabled)
         {
             if (_roomBuildButtons == null) return;
@@ -375,13 +342,11 @@ namespace DungKeeper
 
         private void OnUnitRebellionStarted(UnitRebellionStartedEvent evt)
         {
-            var report = new StrikeReport(
-                evt.Unit,
-                evt.StrikeType,
-                $"{evt.Unit.Name} has had enough and is stirring up trouble!",
-                Time.time);
-
-            ShowStrikeWarning(report);
+            // Show the strike panel with a minimal synthetic report.
+            // The StrikeSystem will provide fuller data via ShowStrikeWarning once its tick runs.
+            _strikeWarningPanel?.SetActive(true);
+            SetText(_strikeWarningText,
+                $"REBELLION! {evt.Unit.Name} has snapped ({evt.StrikeType})!");
         }
 
         private void OnThreatSpawned(ThreatSpawnedEvent evt)
@@ -408,14 +373,14 @@ namespace DungKeeper
 
         private static string BuildInspectFeedback(UnitData unit)
         {
-            if (unit.Anger > 80f)    return "Furious! Handle with care.";
-            if (unit.Morale < 20f)   return "Morale is critically low.";
-            if (unit.Fear > 80f)     return "Terrified — near breaking point.";
-            if (unit.Loyalty < 20f)  return "Loyalty is dangerously low.";
-            if (unit.Hunger > 70f)   return "Starving — needs food now.";
-            if (unit.Fatigue > 80f)  return "Exhausted — needs rest.";
-            if (unit.State == UnitState.Rebelling) return "Actively rebelling!";
-            if (unit.State == UnitState.Impressed) return "Impressed — productivity boosted!";
+            if (unit.Anger > 80f)                       return "Furious — handle with care.";
+            if (unit.Morale < 20f)                      return "Morale is critically low.";
+            if (unit.Fear > 80f)                        return "Terrified — near breaking point.";
+            if (unit.Loyalty < 20f)                     return "Loyalty is dangerously low.";
+            if (unit.Hunger > 70f)                      return "Starving — needs food now.";
+            if (unit.Fatigue > 80f)                     return "Exhausted — needs rest.";
+            if (unit.State == UnitState.Rebelling)      return "Actively rebelling!";
+            if (unit.State == UnitState.Impressed)      return "Impressed — productivity boosted!";
             return "Status nominal.";
         }
     }

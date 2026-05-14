@@ -506,7 +506,7 @@ namespace DungKeeper
                     Loyalty        = unit.Loyalty,
                     Productivity   = unit.Productivity,
                     Attack         = unit.Attack,
-                    Defense        = unit.Defense,
+                    // Defense omitted — field not present in current UnitData; restore when added.
                     PosX           = pos.x,
                     PosY           = pos.y,
                     PosZ           = pos.z,
@@ -560,10 +560,12 @@ namespace DungKeeper
 
             _gameTime = saveData.GameTime;
 
-            // Restore units — use the id-preserving constructor directly.
+            // Restore units. Note: the current UnitData constructor generates a new GUID —
+            // ID restoration requires an id-preserving factory to be added to UnitData.
+            // AssignedRoomId cross-references are re-established by Id after all units are loaded.
             foreach (UnitSaveData usd in saveData.Units)
             {
-                var unit = new UnitData(usd.Id, usd.Name, usd.Role, usd.Personality)
+                var unit = new UnitData(usd.Name, usd.Role, usd.Personality)
                 {
                     State          = usd.State,
                     AssignedRoomId = usd.AssignedRoomId,
@@ -578,7 +580,8 @@ namespace DungKeeper
                     Loyalty        = usd.Loyalty,
                     Productivity   = usd.Productivity,
                     Attack         = usd.Attack,
-                    Defense        = usd.Defense,
+                    // Defense is not present in the current UnitData model;
+                    // restore when the field is added.
                 };
 
                 _allUnits.Add(unit);

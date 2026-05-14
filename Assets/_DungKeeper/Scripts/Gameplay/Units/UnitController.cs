@@ -260,9 +260,8 @@ namespace DungKeeper
             if (_shakeCoroutine != null) StopCoroutine(_shakeCoroutine);
             _shakeCoroutine = StartCoroutine(SlapShakeRoutine(shakeIntensity, _slapShakeDuration));
 
-            // --- Camera shake ---
-            if (CameraShake.Instance != null)
-                CameraShake.Instance.ShakeFromSlapForce(force);
+            // --- Camera shake — intensity scales with normalised force ---
+            CameraShake.Shake(Mathf.Clamp01(force / 10f));
         }
 
         // ==================================================================
