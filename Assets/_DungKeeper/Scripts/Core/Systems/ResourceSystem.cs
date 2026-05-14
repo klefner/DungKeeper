@@ -261,8 +261,7 @@ namespace DungKeeper
             pool.Current   = Math.Max(0f, pool.Current - amount);
             Pools[type]    = pool;
 
-            float actualDelta = pool.Current - before;   // negative
-            FireEvent(type, actualDelta, pool.Current);
+            FireEvent(type, before, pool.Current);
             return true;
         }
 
@@ -322,9 +321,8 @@ namespace DungKeeper
             pool.Current = Math.Clamp(pool.Current + delta, 0f, pool.Max);
             Pools[type]  = pool;
 
-            float actualDelta = pool.Current - before;
-            if (Math.Abs(actualDelta) > 0.00001f)
-                FireEvent(type, actualDelta, pool.Current);
+            if (Math.Abs(pool.Current - before) > 0.00001f)
+                FireEvent(type, before, pool.Current);
         }
 
         private void WriteRate(ResourceType type, float rate)
@@ -334,9 +332,11 @@ namespace DungKeeper
             Pools[type]         = pool;
         }
 
-        private void FireEvent(ResourceType type, float delta, float newTotal)
+        /// <param name="previousValue">Value before the change.</param>
+        /// <param name="newValue">Value after the change (clamped).</param>
+        private void FireEvent(ResourceType type, float previousValue, float newValue)
         {
-            var evt = new ResourceChangedEvent(type, delta, newTotal);
+            var evt = new ResourceChangedEvent(type, previousValue, newValue);
             OnResourceChanged?.Invoke(evt);
             EventBus.Global.Publish(evt);
         }

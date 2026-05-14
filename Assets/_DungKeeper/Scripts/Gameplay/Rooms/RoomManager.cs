@@ -22,15 +22,12 @@ namespace DungKeeper
         [SerializeField] private float _cellSize   = 2f;
 
         [Header("Room Definitions")]
-        [Tooltip("Array of all available room types. Index must match RoomType enum order or be looked up by RoomType field.")]
+        [Tooltip("All available room type archetypes. Looked up by RoomType enum value.")]
         [SerializeField] private RoomTypeSO[] _roomDefinitions;
 
         [Header("Placement Preview")]
+        [Tooltip("Generic ghost prefab used when a RoomTypeSO has no Prefab set.")]
         [SerializeField] private GameObject _ghostPrefab;
-
-        [Header("Dependencies")]
-        [Tooltip("Resource system used to validate and deduct construction costs.")]
-        [SerializeField] private ResourceSystem _resourceSystem;
 
         // -------------------------------------------------------------------------
         // Runtime state
@@ -39,13 +36,13 @@ namespace DungKeeper
         private readonly Dictionary<Vector3Int, RoomController> _grid
             = new Dictionary<Vector3Int, RoomController>();
 
-        private GameObject  _ghostInstance;
-        private Renderer[]  _ghostRenderers;
-        private RoomType    _selectedRoomType;
-        private bool        _isPlacementMode;
+        private GameObject _ghostInstance;
+        private Renderer[] _ghostRenderers;
+        private RoomType   _selectedRoomType;
+        private bool       _isPlacementMode;
 
-        // Ghost material colors.
-        private static readonly Color ValidPlacementColor   = new Color(0.2f, 1f, 0.3f, 0.45f);
+        // Ghost material tint colors.
+        private static readonly Color ValidPlacementColor   = new Color(0.2f, 1f,  0.3f, 0.45f);
         private static readonly Color InvalidPlacementColor = new Color(1f,  0.2f, 0.1f, 0.45f);
 
         // Layer mask for the ground plane raycast.
@@ -65,11 +62,12 @@ namespace DungKeeper
         private void Update()
         {
             if (!_isPlacementMode) return;
+            if (Camera.main == null) return;
 
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             if (!Physics.Raycast(ray, out RaycastHit hit, 500f, _groundLayerMask)) return;
 
-            Vector3Int gridPos = WorldToGrid(hit.point);
+            Vector3Int gridPos  = WorldToGrid(hit.point);
             Vector3    worldPos = GridToWorld(gridPos);
 
             // Move ghost to snapped position.
@@ -78,7 +76,7 @@ namespace DungKeeper
 
             bool isValid = IsWithinGrid(gridPos) && !_grid.ContainsKey(gridPos);
 
-            // Tint ghost renderers.
+            // Tint ghost renderers to signal validity.
             if (_ghostRenderers != null)
             {
                 Color tint = isValid ? ValidPlacementColor : InvalidPlacementColor;
@@ -86,15 +84,15 @@ namespace DungKeeper
                     if (r != null) r.material.color = tint;
             }
 
-            // Left-click to confirm placement.
+            // Left-click: confirm placement if cell is valid.
             if (Input.GetMouseButtonDown(0))
             {
                 if (isValid)
                     TryPlaceRoom(gridPos, _selectedRoomType);
-                // If invalid, do not exit placement mode — let the player reposition.
+                // Invalid cell: do not exit — let the player reposition.
             }
 
-            // Right-click or Escape to cancel.
+            // Right-click or Escape: cancel.
             if (Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Escape))
                 ExitPlacementMode();
         }
@@ -108,7 +106,7 @@ namespace DungKeeper
         /// </summary>
         public void EnterPlacementMode(RoomType type)
         {
-            ExitPlacementMode(); // clean up any previous ghost
+            ExitPlacementMode(); // destroy any prior ghost
 
             RoomTypeSO definition = FindDefinition(type);
             if (definition == null)
@@ -120,18 +118,18 @@ namespace DungKeeper
             _selectedRoomType = type;
             _isPlacementMode  = true;
 
-            // Instantiate the ghost from either the room definition's prefab or the generic ghost prefab.
-            GameObject prefabToUse = (definition.RoomPrefab != null) ? definition.RoomPrefab : _ghostPrefab;
+            // Use the definition's prefab if available, otherwise fall back to the generic ghost.
+            GameObject prefabToUse = definition.Prefab != null ? definition.Prefab : _ghostPrefab;
             if (prefabToUse == null)
             {
-                Debug.LogWarning("[RoomManager] No ghost prefab configured. Placement preview will be invisible.");
+                Debug.LogWarning("[RoomManager] No ghost prefab available. Placement preview invisible.");
                 return;
             }
 
-            _ghostInstance  = Instantiate(prefabToUse, Vector3.zero, Quaternion.identity);
+            _ghostInstance      = Instantiate(prefabToUse, Vector3.zero, Quaternion.identity);
             _ghostInstance.name = $"Ghost_{type}";
 
-            // Disable all colliders on the ghost so it does not interfere with raycasts.
+            // Disable colliders so the ghost does not interfere with raycasts.
             foreach (Collider col in _ghostInstance.GetComponentsInChildren<Collider>())
                 col.enabled = false;
 
@@ -181,48 +179,53 @@ namespace DungKeeper
                 return false;
             }
 
-            // Deduct build cost — ResourceSystem returns false if insufficient funds.
-            if (_resourceSystem != null)
+            // Deduct build cost via ResourceSystem (obtained from GameManager).
+            ResourceSystem resources = GameManager.Instance != null
+                ? GameManager.Instance.ResourceSystem
+                : null;
+
+            if (resources != null)
             {
-                if (!_resourceSystem.TrySpend(ResourceType.Gold,    definition.GoldCost))
+                if (!resources.TrySpend(ResourceType.Gold, definition.BuildCostGold))
                 {
-                    Debug.Log($"[RoomManager] Insufficient gold to build {type}.");
+                    Debug.Log($"[RoomManager] Insufficient gold to build {type} (need {definition.BuildCostGold}).");
                     return false;
                 }
-                if (definition.EssenceCost > 0f &&
-                    !_resourceSystem.TrySpend(ResourceType.Essence, definition.EssenceCost))
+
+                if (definition.BuildCostEssence > 0f &&
+                    !resources.TrySpend(ResourceType.Essence, definition.BuildCostEssence))
                 {
-                    // Refund the gold we already spent.
-                    _resourceSystem.Add(ResourceType.Gold, definition.GoldCost);
+                    // Refund gold already spent.
+                    resources.Add(ResourceType.Gold, definition.BuildCostGold);
                     Debug.Log($"[RoomManager] Insufficient essence to build {type}.");
                     return false;
                 }
             }
 
-            // Instantiate the room prefab.
-            GameObject prefab = definition.RoomPrefab != null ? definition.RoomPrefab : _ghostPrefab;
+            // Instantiate room prefab.
+            GameObject prefab = definition.Prefab != null ? definition.Prefab : _ghostPrefab;
             if (prefab == null)
             {
-                Debug.LogError($"[RoomManager] No prefab assigned for {type}.");
+                Debug.LogError($"[RoomManager] No prefab assigned for {type}. Refunding cost.");
+                if (resources != null)
+                {
+                    resources.Add(ResourceType.Gold,    definition.BuildCostGold);
+                    resources.Add(ResourceType.Essence, definition.BuildCostEssence);
+                }
                 return false;
             }
 
-            Vector3          worldPos   = GridToWorld(gridPos);
-            GameObject       roomGO     = Instantiate(prefab, worldPos, Quaternion.identity, transform);
-            RoomController   controller = roomGO.GetComponent<RoomController>();
+            Vector3        worldPos   = GridToWorld(gridPos);
+            GameObject     roomGO     = Instantiate(prefab, worldPos, Quaternion.identity, transform);
+            RoomController controller = roomGO.GetComponent<RoomController>();
 
             if (controller == null)
                 controller = roomGO.AddComponent<RoomController>();
 
-            RoomData data = RoomData.Create(
-                definition.DisplayName,
-                type,
-                definition.Capacity,
-                definition.BaseProductionRate,
-                definition.MaxHealth);
+            // Create runtime RoomData from the ScriptableObject archetype.
+            RoomData data = definition.CreateInstance();
 
             controller.Initialize(data, definition);
-
             _grid[gridPos] = controller;
 
             EventBus.Global.Publish(new RoomBuiltEvent(data));
@@ -244,27 +247,27 @@ namespace DungKeeper
                 return false;
             }
 
-            RoomData      data       = controller.Data;
-            RoomTypeSO    definition = controller.Definition;
+            RoomData   data       = controller.Data;
+            RoomTypeSO definition = controller.Definition;
 
-            // Unassign all units from the room.
-            if (data != null)
+            // Unassign all units.
+            if (data != null && data.AssignedUnitIds.Count > 0)
             {
                 foreach (string unitId in data.AssignedUnitIds)
                     Debug.Log($"[RoomManager] Unassigning unit {unitId} from demolished room {data.Name}.");
                 data.AssignedUnitIds.Clear();
             }
 
-            // Refund partial cost.
-            if (_resourceSystem != null && definition != null)
-            {
-                float goldRefund    = definition.GoldCost    * definition.DemolishRefundFraction;
-                float essenceRefund = definition.EssenceCost * definition.DemolishRefundFraction;
+            // Refund partial build cost.
+            ResourceSystem resources = GameManager.Instance != null
+                ? GameManager.Instance.ResourceSystem
+                : null;
 
-                if (goldRefund > 0f)
-                    _resourceSystem.Add(ResourceType.Gold, goldRefund);
-                if (essenceRefund > 0f)
-                    _resourceSystem.Add(ResourceType.Essence, essenceRefund);
+            if (resources != null && definition != null)
+            {
+                var (goldRefund, essenceRefund) = definition.GetDemolishRefund();
+                if (goldRefund    > 0f) resources.Add(ResourceType.Gold,    goldRefund);
+                if (essenceRefund > 0f) resources.Add(ResourceType.Essence, essenceRefund);
             }
 
             _grid.Remove(gridPos);
@@ -273,13 +276,13 @@ namespace DungKeeper
         }
 
         /// <summary>
-        /// Called by <see cref="RoomController"/> when a room's health drops to zero.
-        /// Removes the entry from the grid without a cost refund.
+        /// Called by <see cref="RoomController"/> when a room's health reaches zero.
+        /// Removes the grid entry without a cost refund.
         /// </summary>
         public void NotifyRoomDestroyed(RoomController controller)
         {
-            Vector3Int key = default;
-            bool found = false;
+            Vector3Int key   = default;
+            bool       found = false;
 
             foreach (var kvp in _grid)
             {
@@ -303,14 +306,14 @@ namespace DungKeeper
         // Query API
         // -------------------------------------------------------------------------
 
-        /// <summary>Returns the controller at a grid position, or null.</summary>
+        /// <summary>Returns the controller at <paramref name="pos"/>, or null if unoccupied.</summary>
         public RoomController GetRoomAt(Vector3Int pos)
         {
             _grid.TryGetValue(pos, out RoomController ctrl);
             return ctrl;
         }
 
-        /// <summary>Aggregates <see cref="RoomData"/> from every placed room.</summary>
+        /// <summary>Returns a snapshot list of <see cref="RoomData"/> for every placed room.</summary>
         public List<RoomData> GetAllRoomData()
         {
             var result = new List<RoomData>(_grid.Count);
@@ -324,7 +327,7 @@ namespace DungKeeper
         // Coordinate conversion
         // -------------------------------------------------------------------------
 
-        /// <summary>Converts a grid cell coordinate to a world-space position (cell centre).</summary>
+        /// <summary>Converts a grid cell coordinate to the world-space centre of that cell.</summary>
         public Vector3 GridToWorld(Vector3Int gridPos)
         {
             return new Vector3(
@@ -333,7 +336,7 @@ namespace DungKeeper
                 gridPos.z * _cellSize + _cellSize * 0.5f);
         }
 
-        /// <summary>Converts a world-space position to the nearest grid cell coordinate.</summary>
+        /// <summary>Converts a world-space position to the enclosing grid cell coordinate.</summary>
         public Vector3Int WorldToGrid(Vector3 worldPos)
         {
             return new Vector3Int(

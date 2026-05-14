@@ -143,9 +143,9 @@ namespace DungKeeper
             unit.MaxHealth   = _baseMaxHealth;
             unit.Health      = _baseMaxHealth;
 
-            // Productivity on UnitData is stored as a 0–1 multiplier; the SO stores
-            // it as a 0–100 percentage to keep Inspector values intuitive.
-            unit.Productivity = _baseProductivity / 100f;
+            // Productivity on UnitData is on the 0-100 scale (same as Inspector value).
+            // GetProductivityMultiplier() normalises it internally.
+            unit.Productivity = _baseProductivity;
 
             // Psychological seeds (clamped to [0, 100] on the UnitData side)
             unit.Fear    = Mathf.Clamp(_baseFear,    0f, 100f);
@@ -153,9 +153,10 @@ namespace DungKeeper
             unit.Anger   = Mathf.Clamp(_baseAnger,   0f, 100f);
             unit.Morale  = Mathf.Clamp(_baseMorale,  0f, 100f);
 
-            // Attack / Defense derived from archetype combat stat (simple linear map)
-            unit.Attack  = _baseCombatAbility * 0.5f;
-            unit.Defense = _baseCombatAbility * 0.1f;
+            // Attack (= CombatAbility) derived from the archetype combat stat.
+            // The merged UnitData maps Attack → CombatAbility; Defense is not a
+            // separate field in the current model.
+            unit.Attack = _baseCombatAbility;
 
             return unit;
         }

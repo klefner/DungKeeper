@@ -155,11 +155,12 @@ namespace DungKeeper
             _gameTime += dt;
 
             // Tick all simulation systems in deterministic order.
-            _moraleSystem.Tick(_allUnits, dt);
-            _taskSystem.Tick(_allUnits, _allRooms, dt);
+            // Argument lists must match the actual system constructor / method signatures.
+            _moraleSystem.Tick(_allUnits, dt, _settings);
+            _taskSystem.AssignTasks(_allUnits, _allRooms, _settings);
             _resourceSystem.Tick(_allUnits, _allRooms, dt);
             _combatSystem.Tick(_allUnits, dt);
-            _strikeSystem.Tick(_allUnits, _allRooms, dt);
+            _strikeSystem.Tick(_allUnits, _gameTime, dt, _resourceSystem, _allRooms);
             _slapSystem.Tick(dt);
 
             CheckAngerRebellionThresholds();
@@ -424,7 +425,7 @@ namespace DungKeeper
             {
                 case SlapResponse.Rebel:
                     if (unit.State != UnitState.Rebelling)
-                        _strikeSystem.StartRebellion(unit);
+                        _strikeSystem.StartStrike(unit, StrikeType.FullRebellion, _gameTime);
                     break;
 
                 case SlapResponse.Quit:
@@ -677,8 +678,10 @@ namespace DungKeeper
                 _settings = GameSettings.Default();
             }
 
-            _slapSystem     = new SlapSystem(_settings);
-            _moraleSystem   = new MoraleSystem(_settings);
+            // Constructor signatures must match the actual system implementations.
+            // SlapSystem and MoraleSystem take an EventBus for internal event dispatch.
+            _slapSystem     = new SlapSystem(EventBus.Global);
+            _moraleSystem   = new MoraleSystem(EventBus.Global);
             _taskSystem     = new TaskSystem(_settings);
             _resourceSystem = new ResourceSystem();
             _combatSystem   = new CombatSystem(_settings);
@@ -734,7 +737,7 @@ namespace DungKeeper
                 if (unit.State == UnitState.Rebelling || unit.State == UnitState.Dead) continue;
 
                 if (unit.Anger >= _settings.AngerRebellionThreshold)
-                    _strikeSystem.StartRebellion(unit);
+                    _strikeSystem.StartStrike(unit, StrikeType.FullRebellion, _gameTime);
             }
         }
 
