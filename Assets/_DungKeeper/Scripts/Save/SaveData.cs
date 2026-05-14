@@ -9,8 +9,12 @@ namespace DungKeeper
 
     /// <summary>
     /// Complete serializable snapshot of one save slot.
-    /// All fields use primitive types (no Unity or MonoBehaviour types) so the
-    /// class survives JSON round-trips without a custom serializer.
+    /// All fields use serialization-friendly types (primitives, enums, and lists)
+    /// so the class survives Unity's <c>JsonUtility</c> round-trips without a
+    /// custom serializer.
+    ///
+    /// Instantiated by <see cref="GameManager.GetSaveData"/> and consumed by
+    /// <see cref="GameManager.LoadFromSaveData"/>; persisted by <see cref="SaveSystem"/>.
     /// </summary>
     [Serializable]
     public sealed class SaveData
@@ -28,8 +32,16 @@ namespace DungKeeper
         /// <summary>UTC timestamp when the save was written.</summary>
         public DateTime SaveTimestamp;
 
-        /// <summary>Cumulative seconds the player has been active in this slot.</summary>
-        public float   TotalPlayTime;
+        /// <summary>Cumulative in-game time accrued in this slot, in seconds.</summary>
+        public float   GameTime;
+
+        // -------------------------------------------------------------------------
+        // Resources (flat floats to match GameManager field access)
+        // -------------------------------------------------------------------------
+
+        public float Gold;
+        public float Essence;
+        public float FearResource;
 
         // -------------------------------------------------------------------------
         // Population
@@ -44,16 +56,6 @@ namespace DungKeeper
         public List<RoomSaveData> Rooms = new List<RoomSaveData>();
 
         // -------------------------------------------------------------------------
-        // Economy
-        // -------------------------------------------------------------------------
-
-        /// <summary>
-        /// Resource pool amounts keyed by <see cref="ResourceType"/>.ToString().
-        /// Stored as strings to survive JSON serialization without a custom converter.
-        /// </summary>
-        public Dictionary<string, float> Resources = new Dictionary<string, float>();
-
-        // -------------------------------------------------------------------------
         // Statistics
         // -------------------------------------------------------------------------
 
@@ -66,14 +68,17 @@ namespace DungKeeper
         // Progression
         // -------------------------------------------------------------------------
 
-        /// <summary>Room type names unlocked so far (populated from <see cref="RoomType"/>.ToString()).</summary>
+        /// <summary>
+        /// Room type names the player has unlocked.
+        /// Stored as strings (via <c>RoomType.ToString()</c>) for forward compatibility.
+        /// </summary>
         public List<string> UnlockedRoomTypes = new List<string>();
 
         // -------------------------------------------------------------------------
         // Per-slot overrides
         // -------------------------------------------------------------------------
 
-        /// <summary>Player-specific balance overrides stored with the save.</summary>
+        /// <summary>Player-specific balance overrides stored alongside the save.</summary>
         public GameSettings SettingsOverride = GameSettings.Default();
     }
 
@@ -82,7 +87,8 @@ namespace DungKeeper
     // =========================================================================
 
     /// <summary>
-    /// Serializable mirror of <see cref="UnitData"/> using only primitive fields.
+    /// Serializable snapshot of one unit's persistent state.
+    /// Enum fields are stored directly so they survive Unity's <c>JsonUtility</c>.
     /// </summary>
     [Serializable]
     public sealed class UnitSaveData
@@ -90,13 +96,13 @@ namespace DungKeeper
         // Identity
         public string          Id;
         public string          Name;
-        public string          Role;        // UnitRole.ToString()
-        public string          Personality; // PersonalityTrait.ToString()
-        public string          State;       // UnitState.ToString()
+        public UnitRole        Role;
+        public PersonalityTrait Personality;
+        public UnitState       State;
 
         // Assignment
         public string          AssignedRoomId;
-        public string          CurrentTask; // TaskType.ToString()
+        public TaskType        CurrentTask;
 
         // Vitals
         public float           Health;
@@ -117,67 +123,10 @@ namespace DungKeeper
         public float           Attack;
         public float           Defense;
 
-        // -------------------------------------------------------------------------
-        // Conversion helpers
-        // -------------------------------------------------------------------------
-
-        /// <summary>Creates a <see cref="UnitSaveData"/> snapshot from a live <see cref="UnitData"/>.</summary>
-        public static UnitSaveData FromUnit(UnitData u)
-        {
-            if (u == null) throw new ArgumentNullException(nameof(u));
-            return new UnitSaveData
-            {
-                Id             = u.Id,
-                Name           = u.Name,
-                Role           = u.Role.ToString(),
-                Personality    = u.Personality.ToString(),
-                State          = u.State.ToString(),
-                AssignedRoomId = u.AssignedRoomId,
-                CurrentTask    = u.CurrentTask.ToString(),
-                Health         = u.Health,
-                MaxHealth      = u.MaxHealth,
-                Hunger         = u.Hunger,
-                Fatigue        = u.Fatigue,
-                Morale         = u.Morale,
-                Fear           = u.Fear,
-                Anger          = u.Anger,
-                Loyalty        = u.Loyalty,
-                Productivity   = u.Productivity,
-                Attack         = u.Attack,
-                Defense        = u.Defense,
-            };
-        }
-
-        /// <summary>Reconstructs a live <see cref="UnitData"/> from a persisted snapshot.</summary>
-        public static UnitData ToUnit(UnitSaveData s)
-        {
-            if (s == null) throw new ArgumentNullException(nameof(s));
-
-            if (!Enum.TryParse(s.Role,        out UnitRole        role))        role        = UnitRole.Worker;
-            if (!Enum.TryParse(s.Personality, out PersonalityTrait personality)) personality = PersonalityTrait.Loyal;
-            if (!Enum.TryParse(s.State,       out UnitState       state))       state       = UnitState.Idle;
-            if (!Enum.TryParse(s.CurrentTask, out TaskType        task))        task        = TaskType.None;
-
-            var u = new UnitData(s.Id, s.Name, role, personality)
-            {
-                State          = state,
-                AssignedRoomId = s.AssignedRoomId,
-                CurrentTask    = task,
-                Health         = s.Health,
-                MaxHealth      = s.MaxHealth,
-                Hunger         = s.Hunger,
-                Fatigue        = s.Fatigue,
-                Morale         = s.Morale,
-                Fear           = s.Fear,
-                Anger          = s.Anger,
-                Loyalty        = s.Loyalty,
-                Productivity   = s.Productivity,
-                Attack         = s.Attack,
-                Defense        = s.Defense,
-            };
-
-            return u;
-        }
+        // World position for respawning the visual controller.
+        public float           PosX;
+        public float           PosY;
+        public float           PosZ;
     }
 
     // =========================================================================
@@ -191,62 +140,19 @@ namespace DungKeeper
     public sealed class RoomSaveData
     {
         public string       Id;
-        public string       RoomType;   // RoomType.ToString()
-        public int          GridX;
-        public int          GridY;
+        public string       Name;
+        public RoomType     Type;
+        public int          Capacity;
+        public float        ProductionRate;
+        public float        BaseProductionRate;
         public float        Health;
+        public float        MaxHealth;
         public bool         IsActive;
         public List<string> AssignedUnitIds = new List<string>();
 
-        // -------------------------------------------------------------------------
-        // Conversion helpers
-        // -------------------------------------------------------------------------
-
-        /// <summary>Creates a <see cref="RoomSaveData"/> snapshot from a live <see cref="RoomData"/>.</summary>
-        /// <param name="r">The room to snapshot.</param>
-        /// <param name="gridX">Grid X coordinate — sourced from <see cref="RoomManager"/> grid key.</param>
-        /// <param name="gridY">Grid Y (Z in Unity 3-D) coordinate.</param>
-        public static RoomSaveData FromRoom(RoomData r, int gridX = 0, int gridY = 0)
-        {
-            if (r == null) throw new ArgumentNullException(nameof(r));
-            return new RoomSaveData
-            {
-                Id              = r.Id,
-                RoomType        = r.Type.ToString(),
-                GridX           = gridX,
-                GridY           = gridY,
-                Health          = r.Health,
-                IsActive        = r.IsActive,
-                AssignedUnitIds = new List<string>(r.AssignedUnitIds),
-            };
-        }
-
-        /// <summary>Reconstructs a live <see cref="RoomData"/> from a persisted snapshot.</summary>
-        public static RoomData ToRoom(RoomSaveData s)
-        {
-            if (s == null) throw new ArgumentNullException(nameof(s));
-
-            if (!Enum.TryParse(s.RoomType, out DungKeeper.RoomType type))
-                type = DungKeeper.RoomType.ProductionChamber;
-
-            // Use conservative defaults for capacity and production rate;
-            // the RoomManager will override these from RoomTypeSO after load.
-            var r = RoomData.Create(
-                name: type.ToString(),
-                type: type,
-                capacity: 4,
-                productionRate: 1f,
-                maxHealth: 200f);
-
-            // Restore persisted mutable state.
-            r.Health   = s.Health;
-            r.IsActive = s.IsActive;
-
-            r.AssignedUnitIds.Clear();
-            if (s.AssignedUnitIds != null)
-                r.AssignedUnitIds.AddRange(s.AssignedUnitIds);
-
-            return r;
-        }
+        // Grid position (world-space coordinates rounded to nearest int by GameManager).
+        public int          GridX;
+        public int          GridY;
+        public int          GridZ;
     }
 }
