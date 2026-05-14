@@ -1,2 +1,3 @@
 # DungKeeper
-reimagined dungeon keeper game
+
+Write access confirmed via Claude Code.
