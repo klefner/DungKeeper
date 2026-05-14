@@ -55,7 +55,7 @@ namespace DungKeeper
         private float _maxHealth;
         private bool  _isDamaged;
 
-        private MaterialPropertyBlock _propBlock = new MaterialPropertyBlock();
+        private MaterialPropertyBlock _propBlock;
         private static readonly int ColorId = Shader.PropertyToID("_BaseColor");
 
         // Track last-applied state to skip redundant visual updates.
@@ -63,6 +63,15 @@ namespace DungKeeper
         private bool _lastKnownIsDamaged;
 
         private Coroutine _damageFlashCoroutine;
+
+        // -------------------------------------------------------------------------
+        // Unity lifecycle
+        // -------------------------------------------------------------------------
+
+        private void Awake()
+        {
+            _propBlock = new MaterialPropertyBlock();
+        }
 
         // -------------------------------------------------------------------------
         // Initialisation
