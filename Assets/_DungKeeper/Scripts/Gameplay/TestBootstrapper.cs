@@ -26,15 +26,24 @@ namespace DungKeeper
             // Wait two seconds to ensure GameManager.Start() has completed.
             yield return new WaitForSeconds(2f);
 
-            Debug.Log($"[TestBootstrapper] Running. GameManager found: {GameManager.Instance != null}");
+            // If GameManager script is not attached in the scene, create one at runtime.
+            if (GameManager.Instance == null)
+            {
+                Debug.LogWarning("[TestBootstrapper] GameManager.Instance is null — creating one at runtime. " +
+                                 "Fix permanently: select the GameManager object in the Hierarchy, " +
+                                 "Add Component → GameManager, then save the scene.");
+                new GameObject("GameManager_Runtime").AddComponent<GameManager>();
+                // Wait for Awake + Start to complete on the new GameManager.
+                yield return new WaitForSeconds(1f);
+            }
 
             if (GameManager.Instance == null)
             {
-                Debug.LogError("[TestBootstrapper] GameManager not found in scene.");
+                Debug.LogError("[TestBootstrapper] GameManager could not be created. Aborting.");
                 yield break;
             }
 
-            Debug.Log($"[TestBootstrapper] Units in simulation: {GameManager.Instance.AllUnits.Count}, Rooms: {GameManager.Instance.AllRooms.Count}");
+            Debug.Log($"[TestBootstrapper] GameManager ready. Units: {GameManager.Instance.AllUnits.Count}, Rooms: {GameManager.Instance.AllRooms.Count}");
 
             // Ground plane — Plane primitive is 10x10 units; scale 4 makes it 40x40.
             GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
@@ -43,7 +52,6 @@ namespace DungKeeper
 
             // Create a visible capsule for the first unit GameManager spawned in StartNewGame.
             var allUnits = GameManager.Instance.AllUnits;
-            Debug.Log($"[TestBootstrapper] AllUnits.Count = {allUnits.Count}");
             if (allUnits.Count > 0)
             {
                 UnitData unitData = allUnits[0];
