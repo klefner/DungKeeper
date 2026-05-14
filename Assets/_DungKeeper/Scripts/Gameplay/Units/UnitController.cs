@@ -95,6 +95,58 @@ namespace DungKeeper
         }
 
         // =====================================================================
+        // Death
+        // =====================================================================
+
+        /// <summary>
+        /// Plays the death visual sequence and destroys this GameObject.
+        /// Called by <see cref="GameManager.DespawnUnit"/> when a unit leaves the simulation.
+        /// </summary>
+        public void Die()
+        {
+            if (Data != null)
+                Data.CurrentState = UnitState.Dead;
+
+            RefreshVisuals();
+
+            if (_animator != null)
+                _animator.SetTrigger("Die");
+
+            // Destroy after a short delay to allow death animation to complete.
+            Destroy(gameObject, 2f);
+        }
+
+        // =====================================================================
+        // Slap reaction visual
+        // =====================================================================
+
+        private static readonly int s_HashSlapReact = Animator.StringToHash("SlapReact");
+
+        /// <summary>
+        /// Triggers the appropriate animation / visual reaction for a slap response.
+        /// Called by <see cref="GameManager.SlapUnit"/> after the SlapSystem resolves.
+        /// </summary>
+        public void PlaySlapReaction(SlapResponse response, float force)
+        {
+            if (_animator != null)
+                _animator.SetTrigger(s_HashSlapReact);
+
+            // Camera shake scales with force and severity
+            float shakeIntensity = response switch
+            {
+                SlapResponse.SpeedUp       => 0.05f * force / 10f,
+                SlapResponse.BecomeExcited => 0.08f * force / 10f,
+                SlapResponse.BecomeAngry   => 0.12f * force / 10f,
+                SlapResponse.Rebel         => 0.20f * force / 10f,
+                SlapResponse.Quit          => 0.25f,
+                _                          => 0.03f * force / 10f
+            };
+
+            CameraShake.AddShake(shakeIntensity);
+            RefreshVisuals();
+        }
+
+        // =====================================================================
         // Visual
         // =====================================================================
 

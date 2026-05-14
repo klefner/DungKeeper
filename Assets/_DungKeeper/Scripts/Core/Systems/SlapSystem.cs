@@ -160,7 +160,7 @@ namespace DungKeeper
             if (unit == null)    throw new ArgumentNullException(nameof(unit));
             if (settings == null) throw new ArgumentNullException(nameof(settings));
 
-            float now = unit.GameTime; // monotonic game clock carried by UnitData
+            float now = Environment.TickCount64 / 1000f; // monotonic wall-clock seconds
 
             // ----------------------------------------------------------------
             // 1. Cooldown check — too recent?
@@ -301,7 +301,7 @@ namespace DungKeeper
                      && unit.CurrentState != UnitState.Rebelling)
             {
                 unit.CurrentState = UnitState.Rebelling;
-                var rebelEvt = new UnitRebellionStartedEvent(unit);
+                var rebelEvt = new UnitRebellionStartedEvent(unit, StrikeType.FullRebellion);
                 OnUnitRebellionStarted?.Invoke(rebelEvt);
                 (_bus ?? EventBus.Global).Publish(rebelEvt);
             }
@@ -370,9 +370,10 @@ namespace DungKeeper
                 case PersonalityTrait.Mercenary:
                 {
                     // If pay is poor, quit chance scales with force
-                    if (unit.CurrentGoldPerTick < MercenaryQuitThreshold)
+                    // Productivity is used as a pay proxy: low productivity = underpaid.
+                    if (unit.Productivity < MercenaryQuitThreshold)
                     {
-                        float quitChance = (1f - unit.CurrentGoldPerTick / MercenaryQuitThreshold)
+                        float quitChance = (1f - unit.Productivity / MercenaryQuitThreshold)
                                            * (adjustedForce / 100f);
                         if (quitChance > 0.6f)
                         {
@@ -561,6 +562,22 @@ namespace DungKeeper
                     : string.Empty;
 
             return prefix + core + suffix;
+        }
+
+        // ------------------------------------------------------------------ //
+        // Per-frame tick
+        // ------------------------------------------------------------------ //
+
+        /// <summary>
+        /// Optional per-frame update hook called by <see cref="GameManager"/>.
+        /// Currently a no-op; reserved for future timed-effect expiry logic
+        /// (e.g. productivity modifier timers) without requiring callers to change.
+        /// </summary>
+        /// <param name="deltaTime">Elapsed seconds since the last frame.</param>
+        public void Tick(float deltaTime)
+        {
+            // Reserved for future timed-modifier expiry tracking.
+            // No-op until the modifier-timer subsystem is implemented.
         }
     }
 }
