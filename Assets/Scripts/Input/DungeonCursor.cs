@@ -15,8 +15,8 @@ namespace DungKeeper
         private int _slapFrame;
         private float _frameTimer;
 
-        // Each frame has its own duration so the swing feels weighted
-        private static readonly float[] FrameTimes = { 0.06f, 0.06f, 0.05f, 0.09f, 0.06f, 0.08f };
+        // back → rotate → IMPACT → rotate → back (one slap cycle)
+        private static readonly float[] FrameTimes = { 0.07f, 0.05f, 0.10f, 0.05f, 0.08f };
 
         public State CurrentState
         {
@@ -36,15 +36,13 @@ namespace DungKeeper
             Instance = this;
             _pointTex   = BuildPoint();
             _canSlapTex = BuildCanSlap();
-            _slapFrames = new[]
-            {
-                BuildBack_Small(),    // 0 – hand small & raised, back visible
-                BuildBack_Medium(),   // 1 – swinging in, back visible, larger
-                BuildBack_Large(),    // 2 – just before flip, full back of hand
-                BuildPalm_Impact(),   // 3 – IMPACT: full palm + yellow flash
-                BuildPalm_FollowThru(), // 4 – past impact, palm still visible, lower
-                BuildPalm_Recoil(),   // 5 – small, retreating, returning to start
-            };
+
+            var back    = BuildBack();       // dark back-of-hand, knuckles visible
+            var rotate  = BuildRotating();   // mid-tone, fingers spreading, fading knuckles
+            var impact  = BuildImpact();     // light palm + yellow flash
+
+            // symmetric: back → rotate → IMPACT → rotate → back
+            _slapFrames = new[] { back, rotate, impact, rotate, back };
             Apply();
         }
 
@@ -70,7 +68,7 @@ namespace DungKeeper
                     Cursor.SetCursor(_slapFrames[0], new Vector2(12, 2), CursorMode.Auto);
                     break;
                 case State.CanSlap:
-                    Cursor.SetCursor(_canSlapTex, new Vector2(16, 16), CursorMode.Auto);
+                    Cursor.SetCursor(_canSlapTex, new Vector2(12, 2), CursorMode.Auto);
                     break;
                 default:
                     Cursor.SetCursor(_pointTex, new Vector2(10, 2), CursorMode.Auto);
@@ -78,137 +76,117 @@ namespace DungKeeper
             }
         }
 
-        // ── static colors ─────────────────────────────────────────────────
+        // ── colors ────────────────────────────────────────────────────────
 
-        private static readonly Color32 Back    = new Color32(195, 145, 90, 255);  // darker back-of-hand
-        private static readonly Color32 Knuckle = new Color32(165, 115, 65, 255);  // knuckle bumps
-        private static readonly Color32 Palm    = new Color32(240, 195, 145, 255); // lighter palm
-        private static readonly Color32 Flash   = new Color32(255, 235, 60, 255);  // impact flash
+        private static readonly Color32 PalmColor    = new Color32(240, 195, 145, 255);
+        private static readonly Color32 BackColor    = new Color32(195, 148, 92, 255);
+        private static readonly Color32 RotateColor  = new Color32(218, 172, 118, 255);
+        private static readonly Color32 KnuckleColor = new Color32(160, 115, 62, 255);
+        private static readonly Color32 FlashColor   = new Color32(255, 235, 55, 255);
+        private static readonly Color32 NailColor    = new Color32(255, 230, 210, 255);
 
-        // ── texture builders ──────────────────────────────────────────────
+        // ── frame builders ────────────────────────────────────────────────
 
+        // Pointing finger (normal state)
         private static Texture2D BuildPoint()
         {
             const int S = 32;
             var px = Blank(S);
-            Rect(px, S, 9, 0, 5, 18, Palm);
-            Rect(px, S, 10, 0, 3, 3, new Color32(255, 230, 210, 255)); // nail
-            Rect(px, S, 14, 7, 5, 13, Palm);
-            Rect(px, S, 19, 9, 5, 11, Palm);
-            Rect(px, S, 24, 11, 4, 9, Palm);
-            Rect(px, S, 7, 18, 21, 10, Palm);
-            Rect(px, S, 3, 21, 8, 7, Palm);
+            Rect(px, S, 9, 0, 5, 18, PalmColor);
+            Rect(px, S, 10, 0, 3, 3, NailColor);
+            Rect(px, S, 14, 7, 5, 13, PalmColor);
+            Rect(px, S, 19, 9, 5, 11, PalmColor);
+            Rect(px, S, 24, 11, 4, 9, PalmColor);
+            Rect(px, S, 7, 18, 21, 10, PalmColor);
+            Rect(px, S, 3, 21, 8, 7, PalmColor);
             return Bake(px, S);
         }
 
+        // Open palm hover (CanSlap — same shape as impact but no flash)
         private static Texture2D BuildCanSlap()
         {
-            // Open palm hover — same as impact but no flash
             const int S = 32;
             var px = Blank(S);
-            Rect(px, S, 1,  0, 4, 18, Palm);
-            Rect(px, S, 6,  0, 4, 20, Palm);
-            Rect(px, S, 11, 0, 4, 22, Palm);
-            Rect(px, S, 16, 0, 4, 20, Palm);
-            Rect(px, S, 21, 4, 4, 14, Palm);
-            Rect(px, S, 1, 17, 24, 12, Palm);
+            Rect(px, S, 1,  0, 4, 18, PalmColor); // pinky
+            Rect(px, S, 6,  0, 4, 20, PalmColor); // ring
+            Rect(px, S, 11, 0, 4, 22, PalmColor); // middle
+            Rect(px, S, 16, 0, 4, 20, PalmColor); // index
+            Rect(px, S, 21, 4, 4, 14, PalmColor); // thumb
+            Rect(px, S, 1, 17, 24, 12, PalmColor); // palm
             return Bake(px, S);
         }
 
-        // Frame 0 – tiny back-of-hand (raised, far away)
-        private static Texture2D BuildBack_Small()
+        // Frame 0 & 4 — back of hand raised: dark skin, knuckle bumps, fingers close together
+        private static Texture2D BuildBack()
         {
             const int S = 32;
             var px = Blank(S);
-            Rect(px, S, 11, 0, 2, 8, Back);  // middle
-            Rect(px, S, 9,  1, 2, 7, Back);  // ring
-            Rect(px, S, 13, 1, 2, 7, Back);  // index
-            Rect(px, S, 7,  2, 2, 5, Back);  // pinky
-            Rect(px, S, 15, 3, 2, 4, Back);  // thumb
-            Rect(px, S, 7,  6, 10, 1, Knuckle); // knuckle ridge
-            Rect(px, S, 7,  7, 10, 4, Back);  // palm (compact)
+
+            // Fingers slightly narrower and closer than palm view (back-of-hand look)
+            Rect(px, S, 3,  0, 3, 18, BackColor); // pinky
+            Rect(px, S, 7,  0, 3, 20, BackColor); // ring
+            Rect(px, S, 11, 0, 3, 22, BackColor); // middle
+            Rect(px, S, 15, 0, 3, 20, BackColor); // index
+            Rect(px, S, 19, 4, 3, 14, BackColor); // thumb (mirrored side vs palm)
+            Rect(px, S, 3, 17, 20, 12, BackColor); // palm
+
+            // Knuckle bumps where fingers meet palm
+            Rect(px, S, 4,  15, 2, 2, KnuckleColor);
+            Rect(px, S, 8,  15, 2, 2, KnuckleColor);
+            Rect(px, S, 12, 15, 2, 2, KnuckleColor);
+            Rect(px, S, 16, 15, 2, 2, KnuckleColor);
+
+            // Knuckle joints mid-finger
+            Rect(px, S, 4,  9,  2, 1, KnuckleColor);
+            Rect(px, S, 8,  10, 2, 1, KnuckleColor);
+            Rect(px, S, 12, 11, 2, 1, KnuckleColor);
+            Rect(px, S, 16, 10, 2, 1, KnuckleColor);
+
             return Bake(px, S);
         }
 
-        // Frame 1 – medium back-of-hand (swinging in)
-        private static Texture2D BuildBack_Medium()
+        // Frames 1 & 3 — hand mid-rotation: fingers spreading, knuckles fading, mid-tone
+        private static Texture2D BuildRotating()
         {
             const int S = 32;
             var px = Blank(S);
-            Rect(px, S, 10, 0, 3, 12, Back); // middle
-            Rect(px, S, 7,  1, 3, 11, Back); // ring
-            Rect(px, S, 13, 1, 3, 11, Back); // index
-            Rect(px, S, 4,  3, 3,  9, Back); // pinky
-            Rect(px, S, 16, 4, 3,  8, Back); // thumb
-            Rect(px, S, 4, 10, 16,  1, Knuckle); // knuckle ridge
-            Rect(px, S, 4, 11, 16,  6, Back); // palm
+
+            // Fingers spreading to palm width, tone between back and palm
+            Rect(px, S, 2,  0, 3, 18, RotateColor); // pinky (spreading left)
+            Rect(px, S, 6,  0, 4, 20, RotateColor); // ring
+            Rect(px, S, 11, 0, 4, 22, RotateColor); // middle
+            Rect(px, S, 16, 0, 4, 20, RotateColor); // index
+            Rect(px, S, 21, 4, 4, 14, RotateColor); // thumb (spreading right)
+            Rect(px, S, 2, 17, 23, 12, RotateColor); // palm
+
+            // Faint knuckle hints (half-visible as hand rotates through)
+            Rect(px, S, 3,  15, 2, 1, KnuckleColor);
+            Rect(px, S, 7,  15, 2, 1, KnuckleColor);
+            Rect(px, S, 12, 15, 2, 1, KnuckleColor);
+            Rect(px, S, 17, 15, 2, 1, KnuckleColor);
+
             return Bake(px, S);
         }
 
-        // Frame 2 – full back-of-hand (just before flip, large)
-        private static Texture2D BuildBack_Large()
+        // Frame 2 — IMPACT: full light palm, fingers fully spread, yellow fingertip flash
+        private static Texture2D BuildImpact()
         {
             const int S = 32;
             var px = Blank(S);
-            Rect(px, S, 9,  0, 4, 16, Back); // middle
-            Rect(px, S, 5,  1, 4, 15, Back); // ring
-            Rect(px, S, 13, 1, 4, 15, Back); // index
-            Rect(px, S, 1,  3, 4, 13, Back); // pinky
-            Rect(px, S, 17, 4, 4, 12, Back); // thumb
-            Rect(px, S, 1, 14, 21,  1, Knuckle); // knuckle ridge
-            Rect(px, S, 1, 15, 21,  8, Back); // palm
-            // knuckle dots on each finger
-            Rect(px, S, 10, 12, 2, 2, Knuckle);
-            Rect(px, S, 6,  12, 2, 2, Knuckle);
-            Rect(px, S, 14, 12, 2, 2, Knuckle);
-            Rect(px, S, 2,  11, 2, 2, Knuckle);
-            return Bake(px, S);
-        }
 
-        // Frame 3 – IMPACT: full palm + yellow fingertip flash
-        private static Texture2D BuildPalm_Impact()
-        {
-            const int S = 32;
-            var px = Blank(S);
-            Rect(px, S, 1,  0, 4, 18, Palm);
-            Rect(px, S, 6,  0, 4, 20, Palm);
-            Rect(px, S, 11, 0, 4, 22, Palm);
-            Rect(px, S, 16, 0, 4, 20, Palm);
-            Rect(px, S, 21, 4, 4, 14, Palm);
-            Rect(px, S, 1, 17, 24, 12, Palm);
-            // flash on fingertips
-            Rect(px, S, 1,  0, 4, 4, Flash);
-            Rect(px, S, 6,  0, 4, 4, Flash);
-            Rect(px, S, 11, 0, 4, 4, Flash);
-            Rect(px, S, 16, 0, 4, 4, Flash);
-            return Bake(px, S);
-        }
+            Rect(px, S, 1,  0, 4, 18, PalmColor); // pinky
+            Rect(px, S, 6,  0, 4, 20, PalmColor); // ring
+            Rect(px, S, 11, 0, 4, 22, PalmColor); // middle
+            Rect(px, S, 16, 0, 4, 20, PalmColor); // index
+            Rect(px, S, 21, 4, 4, 14, PalmColor); // thumb
+            Rect(px, S, 1, 17, 24, 12, PalmColor); // palm
 
-        // Frame 4 – follow-through: palm still large but shifted down (past impact)
-        private static Texture2D BuildPalm_FollowThru()
-        {
-            const int S = 32;
-            var px = Blank(S);
-            Rect(px, S, 2,  5, 4, 16, Palm); // pinky
-            Rect(px, S, 7,  4, 4, 18, Palm); // ring
-            Rect(px, S, 12, 3, 4, 19, Palm); // middle
-            Rect(px, S, 17, 4, 4, 18, Palm); // index
-            Rect(px, S, 22, 7, 4, 13, Palm); // thumb
-            Rect(px, S, 2, 20, 23, 10, Palm); // palm
-            return Bake(px, S);
-        }
+            // Yellow flash on fingertips
+            Rect(px, S, 1,  0, 4, 4, FlashColor);
+            Rect(px, S, 6,  0, 4, 4, FlashColor);
+            Rect(px, S, 11, 0, 4, 4, FlashColor);
+            Rect(px, S, 16, 0, 4, 4, FlashColor);
 
-        // Frame 5 – recoil: small palm retreating back up
-        private static Texture2D BuildPalm_Recoil()
-        {
-            const int S = 32;
-            var px = Blank(S);
-            Rect(px, S, 8,  9, 3, 9, Palm);  // ring
-            Rect(px, S, 12, 8, 3, 11, Palm); // middle
-            Rect(px, S, 16, 9, 3, 9, Palm);  // index
-            Rect(px, S, 5,  10, 3, 7, Palm); // pinky
-            Rect(px, S, 19, 11, 3, 6, Palm); // thumb
-            Rect(px, S, 5,  17, 18, 5, Palm); // palm (small)
             return Bake(px, S);
         }
 
