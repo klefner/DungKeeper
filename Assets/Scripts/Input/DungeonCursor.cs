@@ -10,60 +10,87 @@ namespace DungKeeper
 
         private State _state;
         private Texture2D _pointTex;
-        private Texture2D _slapTex;
+        private Texture2D _canSlapTex;
+        private Texture2D[] _slapFrames;
+        private int _slapFrame;
+        private float _frameTimer;
+        private const float FrameInterval = 0.07f; // ~14 fps
 
         public State CurrentState
         {
             get => _state;
-            set { if (_state != value) { _state = value; Apply(); } }
+            set
+            {
+                if (_state == value) return;
+                _state = value;
+                _slapFrame = 0;
+                _frameTimer = 0f;
+                Apply();
+            }
         }
 
         private void Awake()
         {
             Instance = this;
-            _pointTex = BuildPoint();
-            _slapTex  = BuildSlap();
+            _pointTex   = BuildPoint();
+            _canSlapTex = BuildSlap();
+            _slapFrames = new[]
+            {
+                BuildSlapRaised(),  // 0 – backswing: hand compact and high
+                BuildSlapMid(),     // 1 – mid-swing
+                BuildSlapImpact(),  // 2 – impact + yellow flash
+                BuildSlapMid(),     // 3 – recoil (reuse mid frame)
+            };
             Apply();
+        }
+
+        private void Update()
+        {
+            if (_state != State.Slapping) return;
+            _frameTimer += Time.deltaTime;
+            if (_frameTimer < FrameInterval) return;
+            _frameTimer -= FrameInterval;
+            _slapFrame = (_slapFrame + 1) % _slapFrames.Length;
+            Cursor.SetCursor(_slapFrames[_slapFrame], SlapHotspot, CursorMode.Auto);
         }
 
         private void OnDestroy() =>
             Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
 
+        private static readonly Vector2 SlapHotspot = new Vector2(12, 2);
+
         private void Apply()
         {
-            if (_state == State.Slapping)
-                Cursor.SetCursor(_slapTex, new Vector2(16, 16), CursorMode.Auto);
-            else
-                Cursor.SetCursor(_pointTex, new Vector2(10, 2), CursorMode.Auto);
+            switch (_state)
+            {
+                case State.Slapping:
+                    Cursor.SetCursor(_slapFrames[0], SlapHotspot, CursorMode.Auto);
+                    break;
+                case State.CanSlap:
+                    Cursor.SetCursor(_canSlapTex, new Vector2(16, 16), CursorMode.Auto);
+                    break;
+                default:
+                    Cursor.SetCursor(_pointTex, new Vector2(10, 2), CursorMode.Auto);
+                    break;
+            }
         }
 
         // ── texture builders ──────────────────────────────────────────────
 
         private static Texture2D BuildPoint()
         {
-            // 32x32 pointing-hand cursor (index finger up)
             const int S = 32;
-            var skin  = new Color32(240, 195, 145, 255);
-            var nail  = new Color32(255, 230, 210, 255);
-            var px    = Blank(S);
+            var skin = new Color32(240, 195, 145, 255);
+            var nail = new Color32(255, 230, 210, 255);
+            var px   = Blank(S);
 
-            // index finger — columns 9-13, rows 0-17
             Rect(px, S, 9, 0, 5, 18, skin);
-            Rect(px, S, 10, 0, 3, 3, nail);        // nail
+            Rect(px, S, 10, 0, 3, 3, nail);
 
-            // middle finger curled — cols 14-18, rows 7-19
             Rect(px, S, 14, 7, 5, 13, skin);
-
-            // ring finger curled — cols 19-23, rows 9-19
             Rect(px, S, 19, 9, 5, 11, skin);
-
-            // pinky curled — cols 24-27, rows 11-19
             Rect(px, S, 24, 11, 4, 9, skin);
-
-            // palm — cols 7-27, rows 18-28
             Rect(px, S, 7, 18, 21, 10, skin);
-
-            // thumb — cols 3-10, rows 21-27
             Rect(px, S, 3, 21, 8, 7, skin);
 
             return Bake(px, S);
@@ -71,20 +98,74 @@ namespace DungKeeper
 
         private static Texture2D BuildSlap()
         {
-            // 32x32 open-palm slap cursor (hand flat, fingers spread down)
+            // CanSlap hover – open palm facing down
             const int S = 32;
             var skin = new Color32(240, 195, 145, 255);
             var px   = Blank(S);
 
-            // fingers (spread, pointing down from palm)
-            Rect(px, S, 1,  0, 4, 18, skin); // pinky
-            Rect(px, S, 6,  0, 4, 20, skin); // ring
-            Rect(px, S, 11, 0, 4, 22, skin); // middle
-            Rect(px, S, 16, 0, 4, 20, skin); // index
-            Rect(px, S, 21, 4, 4, 14, skin); // thumb
-
-            // palm
+            Rect(px, S, 1,  0, 4, 18, skin);
+            Rect(px, S, 6,  0, 4, 20, skin);
+            Rect(px, S, 11, 0, 4, 22, skin);
+            Rect(px, S, 16, 0, 4, 20, skin);
+            Rect(px, S, 21, 4, 4, 14, skin);
             Rect(px, S, 1, 17, 24, 12, skin);
+
+            return Bake(px, S);
+        }
+
+        // Frame 0 – hand compact and high (backswing)
+        private static Texture2D BuildSlapRaised()
+        {
+            const int S = 32;
+            var skin = new Color32(240, 195, 145, 255);
+            var px   = Blank(S);
+
+            Rect(px, S, 3,  0, 3, 11, skin); // pinky
+            Rect(px, S, 7,  0, 3, 13, skin); // ring
+            Rect(px, S, 11, 0, 3, 15, skin); // middle
+            Rect(px, S, 15, 0, 3, 13, skin); // index
+            Rect(px, S, 19, 3, 3,  8, skin); // thumb
+            Rect(px, S, 2, 10, 20,  7, skin); // palm (compact)
+
+            return Bake(px, S);
+        }
+
+        // Frames 1 & 3 – hand at mid-swing
+        private static Texture2D BuildSlapMid()
+        {
+            const int S = 32;
+            var skin = new Color32(240, 195, 145, 255);
+            var px   = Blank(S);
+
+            Rect(px, S, 2,  0, 3, 14, skin); // pinky
+            Rect(px, S, 6,  0, 4, 16, skin); // ring
+            Rect(px, S, 11, 0, 4, 18, skin); // middle
+            Rect(px, S, 15, 0, 4, 16, skin); // index
+            Rect(px, S, 20, 2, 4, 11, skin); // thumb
+            Rect(px, S, 1, 13, 22,  9, skin); // palm
+
+            return Bake(px, S);
+        }
+
+        // Frame 2 – full-size impact with yellow fingertip flash
+        private static Texture2D BuildSlapImpact()
+        {
+            const int S = 32;
+            var skin  = new Color32(240, 195, 145, 255);
+            var flash = new Color32(255, 230, 50, 255);
+            var px    = Blank(S);
+
+            Rect(px, S, 1,  0, 4, 18, skin);
+            Rect(px, S, 6,  0, 4, 20, skin);
+            Rect(px, S, 11, 0, 4, 22, skin);
+            Rect(px, S, 16, 0, 4, 20, skin);
+            Rect(px, S, 21, 4, 4, 14, skin);
+            Rect(px, S, 1, 17, 24, 12, skin);
+            // yellow flash on fingertips at impact
+            Rect(px, S, 1,  0, 4, 3, flash);
+            Rect(px, S, 6,  0, 4, 3, flash);
+            Rect(px, S, 11, 0, 4, 3, flash);
+            Rect(px, S, 16, 0, 4, 3, flash);
 
             return Bake(px, S);
         }
