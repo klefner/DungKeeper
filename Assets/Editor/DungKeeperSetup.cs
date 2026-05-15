@@ -60,18 +60,64 @@ namespace DungKeeper.Editor
 
         private static bool PullLatest()
         {
-            var repoPath = System.IO.Path.GetFullPath(
-                System.IO.Path.Combine(Application.dataPath, ".."));
-
-            var result = RunGit("pull", repoPath);
-            if (result.exitCode == 0)
+            // The git repo lives separately from the Unity project.
+            // Try the repo path first; fall back to the Unity project root.
+            var userProfile = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+            var repoCandidates = new[]
             {
-                Debug.Log($"[DungKeeperSetup] Git pull succeeded:\n{result.output}");
-                return true;
+                System.IO.Path.Combine(userProfile, "Documents", "GitHub", "DungKeeper"),
+                System.IO.Path.Combine(userProfile, "GitHub", "DungKeeper"),
+                System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..")),
+            };
+
+            string repoPath = null;
+            foreach (var candidate in repoCandidates)
+            {
+                if (System.IO.Directory.Exists(System.IO.Path.Combine(candidate, ".git")))
+                {
+                    repoPath = candidate;
+                    break;
+                }
             }
 
-            Debug.LogError($"[DungKeeperSetup] Git pull failed:\n{result.error}");
-            return false;
+            if (repoPath == null)
+            {
+                Debug.LogError("[DungKeeperSetup] Could not find the DungKeeper git repository.");
+                return false;
+            }
+
+            var result = RunGit("pull", repoPath);
+            if (result.exitCode != 0)
+            {
+                Debug.LogError($"[DungKeeperSetup] Git pull failed:\n{result.error}");
+                return false;
+            }
+
+            Debug.Log($"[DungKeeperSetup] Git pull succeeded from {repoPath}");
+
+            // Copy updated Assets into the Unity project if they live in separate folders.
+            var unityAssets = Application.dataPath;
+            var repoAssets = System.IO.Path.Combine(repoPath, "Assets");
+            if (!string.Equals(unityAssets, repoAssets, System.StringComparison.OrdinalIgnoreCase)
+                && System.IO.Directory.Exists(repoAssets))
+            {
+                CopyDirectory(repoAssets, unityAssets);
+                Debug.Log("[DungKeeperSetup] Assets synced from git repo to Unity project.");
+            }
+
+            return true;
+        }
+
+        private static void CopyDirectory(string source, string dest)
+        {
+            System.IO.Directory.CreateDirectory(dest);
+            foreach (var file in System.IO.Directory.GetFiles(source, "*", System.IO.SearchOption.AllDirectories))
+            {
+                var relative = file.Substring(source.Length).TrimStart('\\', '/');
+                var destFile = System.IO.Path.Combine(dest, relative);
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(destFile));
+                System.IO.File.Copy(file, destFile, overwrite: true);
+            }
         }
 
         private static (int exitCode, string output, string error) RunGit(string args, string workingDir)
