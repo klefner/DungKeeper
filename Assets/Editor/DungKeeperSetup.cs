@@ -1,9 +1,7 @@
 using System.Diagnostics;
 using UnityEditor;
-using UnityEditor.AI;
 using UnityEditor.Compilation;
 using UnityEngine;
-using UnityEngine.AI;
 using Debug = UnityEngine.Debug;
 
 namespace DungKeeper.Editor
@@ -167,7 +165,7 @@ namespace DungKeeper.Editor
 
         private static void BakeNavMesh()
         {
-            NavMeshBuilder.BuildNavMesh();
+            UnityEditor.AI.NavMeshBuilder.BuildNavMesh();
             Debug.Log("[DungKeeperSetup] NavMesh baked.");
         }
     }
