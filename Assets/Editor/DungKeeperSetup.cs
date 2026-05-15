@@ -45,6 +45,7 @@ namespace DungKeeper.Editor
             EnsureGameManager();
             EnsureRoom();
             EnsureCreature();
+            EnsureCursor();
             SetupCamera();
             BakeNavMesh();
 
@@ -161,10 +162,15 @@ namespace DungKeeper.Editor
 
         private static void EnsureRoom()
         {
-            if (Object.FindFirstObjectByType<RoomGenerator>() != null) return;
+            var existing = Object.FindFirstObjectByType<RoomGenerator>();
+            if (existing != null)
+            {
+                existing.BuildRoom(); // always rebuild so dimension changes take effect
+                return;
+            }
             var go = new GameObject("DungeonRoom");
             var room = go.AddComponent<RoomGenerator>();
-            room.BuildRoom(); // Awake doesn't fire in edit mode
+            room.BuildRoom();
             Undo.RegisterCreatedObjectUndo(go, "Create DungeonRoom");
             Debug.Log("[DungKeeperSetup] Dungeon room created.");
         }
@@ -222,6 +228,14 @@ namespace DungKeeper.Editor
             var mat = new Material(shader);
             mat.color = color;
             r.sharedMaterial = mat;
+        }
+
+        private static void EnsureCursor()
+        {
+            if (Object.FindFirstObjectByType<DungeonCursor>() != null) return;
+            var go = new GameObject("DungeonCursor");
+            go.AddComponent<DungeonCursor>();
+            Undo.RegisterCreatedObjectUndo(go, "Create DungeonCursor");
         }
 
         private static void SetupCamera()

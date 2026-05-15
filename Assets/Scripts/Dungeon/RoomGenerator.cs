@@ -13,8 +13,8 @@ namespace DungKeeper
 
         public void BuildRoom()
         {
-            foreach (Transform child in transform)
-                Destroy(child.gameObject);
+            for (int i = transform.childCount - 1; i >= 0; i--)
+                DestroyImmediate(transform.GetChild(i).gameObject);
 
             var stone = MakeMat(new Color(0.22f, 0.19f, 0.17f));
             var floor  = MakeMat(new Color(0.28f, 0.24f, 0.20f));
