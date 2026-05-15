@@ -21,22 +21,15 @@ namespace DungKeeper.Editor
                 return;
 
             // If GameManager isn't compiled yet, wait for the recompile that Refresh triggers.
-            if (FindGameManagerType() != null)
-            {
-                AssetDatabase.Refresh();
-                SetupScene();
-            }
-            else
-            {
-                Debug.Log("[DungKeeperSetup] New scripts detected — waiting for recompile before setup.");
-                CompilationPipeline.compilationFinished += OnCompilationFinished;
-                AssetDatabase.Refresh();
-            }
+            AssetDatabase.Refresh();
+            // Poll until Unity finishes compiling, then run setup
+            EditorApplication.update += WaitForCompileAndSetup;
         }
 
-        private static void OnCompilationFinished(object _)
+        private static void WaitForCompileAndSetup()
         {
-            CompilationPipeline.compilationFinished -= OnCompilationFinished;
+            if (EditorApplication.isCompiling) return;
+            EditorApplication.update -= WaitForCompileAndSetup;
             SetupScene();
         }
 
@@ -170,7 +163,8 @@ namespace DungKeeper.Editor
         {
             if (Object.FindFirstObjectByType<RoomGenerator>() != null) return;
             var go = new GameObject("DungeonRoom");
-            go.AddComponent<RoomGenerator>();
+            var room = go.AddComponent<RoomGenerator>();
+            room.BuildRoom(); // Awake doesn't fire in edit mode
             Undo.RegisterCreatedObjectUndo(go, "Create DungeonRoom");
             Debug.Log("[DungKeeperSetup] Dungeon room created.");
         }

@@ -2,6 +2,7 @@ using UnityEngine;
 
 namespace DungKeeper
 {
+    [ExecuteAlways]
     public class RoomGenerator : MonoBehaviour
     {
         public float width = 14f;
