@@ -165,7 +165,10 @@ namespace DungKeeper.Editor
 
         private static void BakeNavMesh()
         {
+            // Legacy bake API — suppressed until project adopts NavMeshSurface workflow
+#pragma warning disable CS0618
             UnityEditor.AI.NavMeshBuilder.BuildNavMesh();
+#pragma warning restore CS0618
             Debug.Log("[DungKeeperSetup] NavMesh baked.");
         }
     }

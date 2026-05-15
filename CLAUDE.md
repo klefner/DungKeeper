@@ -91,6 +91,24 @@ Example: `feat(player): add guest account creation flow`
 
 ---
 
+## Dev Environment (CONFIRMED 2026-05-15)
+
+| Item | Path |
+|------|------|
+| Git repo (GitHub Desktop) | `C:\Users\KentLefner\Documents\GitHub\DungKeeper` |
+| Unity project | `C:\Users\KentLefner\DungKeeper` |
+| Session transcripts | `/root/.claude/projects/-home-user-DungKeeper/*.jsonl` |
+
+**These are two separate folders.** Code changes pushed to git do NOT automatically appear in Unity. The sync mechanism is:
+1. GitHub Desktop → Fetch → Pull (updates the git repo)
+2. **DungKeeper → Sync Latest + Setup Scene** in Unity (pulls git repo, copies Assets across, triggers recompile)
+
+For one-time bootstrap only: run `tools/sync-to-unity.bat` from the git repo after pulling.
+
+**At session start:** Always read session transcripts from `/root/.claude/projects/-home-user-DungKeeper/` before doing anything else.
+
+---
+
 ## Key Decisions Log
 
 | Date | Decision | Rationale |
@@ -98,7 +116,8 @@ Example: `feat(player): add guest account creation flow`
 | 2026-05-14 | Strict branch protection on `main` + `develop` | Solo AI resource — no peer review, automated gates are the only safeguard |
 | 2026-05-14 | Local-first architecture | Single-player MVP; cloud is sync layer, not source of truth |
 | 2026-05-14 | PlayFab preferred over Firebase for player data | Better game-specific features: cloud saves, conflict resolution, offline support |
-| 2026-05-14 | Unity project lives at repo root | Unity convention; `Assets/`, `Packages/`, `ProjectSettings/` at root |
+| 2026-05-15 | Git repo and Unity project are separate folders | Unity project predates git setup; sync-to-unity.bat + Sync Latest menu bridges them |
+| 2026-05-15 | NavMesh legacy bake API suppressed | Switching to NavMeshSurface deferred until scene design is defined |
 
 ---
 
