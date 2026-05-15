@@ -50,6 +50,9 @@ namespace DungKeeper.Editor
             }
 
             EnsureGameManager();
+            EnsureRoom();
+            EnsureCreature();
+            SetupCamera();
             BakeNavMesh();
 
             UnityEditor.SceneManagement.EditorSceneManager.MarkAllScenesDirty();
@@ -161,6 +164,80 @@ namespace DungKeeper.Editor
             go.AddComponent(gmType);
             Undo.RegisterCreatedObjectUndo(go, "Create GameManager");
             Debug.Log("[DungKeeperSetup] GameManager added to scene.");
+        }
+
+        private static void EnsureRoom()
+        {
+            if (Object.FindFirstObjectByType<RoomGenerator>() != null) return;
+            var go = new GameObject("DungeonRoom");
+            go.AddComponent<RoomGenerator>();
+            Undo.RegisterCreatedObjectUndo(go, "Create DungeonRoom");
+            Debug.Log("[DungKeeperSetup] Dungeon room created.");
+        }
+
+        private static void EnsureCreature()
+        {
+            if (Object.FindFirstObjectByType<Creature>() != null) return;
+
+            // Body
+            var root = new GameObject("Creature");
+            root.transform.position = new Vector3(0, 0.75f, 0);
+
+            var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            body.name = "Body";
+            body.transform.SetParent(root.transform);
+            body.transform.localPosition = Vector3.zero;
+            body.transform.localScale = new Vector3(0.6f, 0.75f, 0.6f);
+            SetMaterialColor(body, new Color(0.18f, 0.72f, 0.22f));
+
+            // Eyes
+            AddEye(root.transform, new Vector3( 0.13f, 0.55f, 0.28f));
+            AddEye(root.transform, new Vector3(-0.13f, 0.55f, 0.28f));
+
+            root.AddComponent<Creature>();
+            root.AddComponent<SlapController>();
+
+            Undo.RegisterCreatedObjectUndo(root, "Create Creature");
+            Debug.Log("[DungKeeperSetup] Creature added to scene.");
+        }
+
+        private static void AddEye(Transform parent, Vector3 localPos)
+        {
+            var eye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            eye.name = "Eye";
+            eye.transform.SetParent(parent);
+            eye.transform.localPosition = localPos;
+            eye.transform.localScale = Vector3.one * 0.12f;
+            SetMaterialColor(eye, Color.white);
+            Object.DestroyImmediate(eye.GetComponent<Collider>());
+
+            var pupil = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            pupil.name = "Pupil";
+            pupil.transform.SetParent(eye.transform);
+            pupil.transform.localPosition = new Vector3(0, 0, 0.5f);
+            pupil.transform.localScale = Vector3.one * 0.5f;
+            SetMaterialColor(pupil, Color.black);
+            Object.DestroyImmediate(pupil.GetComponent<Collider>());
+        }
+
+        private static void SetMaterialColor(GameObject go, Color color)
+        {
+            var r = go.GetComponent<Renderer>();
+            if (r == null) return;
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            var mat = new Material(shader);
+            mat.color = color;
+            r.sharedMaterial = mat;
+        }
+
+        private static void SetupCamera()
+        {
+            var cam = Camera.main;
+            if (cam == null) return;
+            cam.transform.position = new Vector3(0, 12f, -8f);
+            cam.transform.rotation = Quaternion.Euler(55f, 0f, 0f);
+            cam.backgroundColor = new Color(0.05f, 0.03f, 0.05f);
+            cam.clearFlags = CameraClearFlags.SolidColor;
         }
 
         private static void BakeNavMesh()
