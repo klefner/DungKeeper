@@ -29,7 +29,8 @@ namespace DungKeeper
 
             var dir = target - transform.position;
             if (dir.sqrMagnitude > 0.01f)
-                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), 10f * Time.deltaTime);
+                transform.rotation = Quaternion.Slerp(transform.rotation,
+                                         Quaternion.LookRotation(dir), 10f * Time.deltaTime);
 
             if (Vector3.Distance(transform.position, target) < 0.15f)
                 PickTarget();
@@ -52,23 +53,42 @@ namespace DungKeeper
         private IEnumerator SlapRoutine()
         {
             slapped = true;
-            currentSpeed = roamSpeed * 3.5f;
+            currentSpeed = roamSpeed * 5f;
             SetColor(SlappedColor);
 
-            // bounce
+            SpawnSlapText();
+
+            // big dramatic bounce
             var origin = transform.position;
-            for (float t = 0; t < 1f; t += Time.deltaTime * 10f)
+            for (float t = 0; t < 1f; t += Time.deltaTime * 6f)
             {
-                transform.position = origin + Vector3.up * (Mathf.Sin(t * Mathf.PI) * 0.6f);
+                transform.position = origin + Vector3.up * (Mathf.Sin(t * Mathf.PI) * 1.5f);
                 yield return null;
             }
             transform.position = origin;
 
-            yield return new WaitForSeconds(3f);
+            // frantic running — keep changing direction
+            float elapsed = 0f;
+            while (elapsed < 6f)
+            {
+                elapsed += Time.deltaTime;
+                // flash between red and orange while panicked
+                float flash = Mathf.PingPong(elapsed * 8f, 1f);
+                SetColor(Color.Lerp(SlappedColor, new Color(1f, 0.5f, 0f), flash));
+                yield return null;
+            }
 
             currentSpeed = roamSpeed;
             SetColor(NormalColor);
             slapped = false;
+        }
+
+        private void SpawnSlapText()
+        {
+            var go = new GameObject("SlapText");
+            go.transform.position = transform.position + Vector3.up * 2f;
+            var txt = go.AddComponent<FloatUpText>();
+            txt.Init("SMACK!");
         }
 
         private void SetColor(Color c)
