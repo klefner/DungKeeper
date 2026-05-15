@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace DungKeeper
 {
@@ -14,8 +15,13 @@ namespace DungKeeper
         private Texture2D[] _slapFrames;
         private int _slapFrame;
         private float _frameTimer;
+        private RawImage _cursorImg;
+        private RectTransform _cursorRect;
 
-        // Timings: backswing-start, backswing-mid, IMPACT (lingers), follow-thru, return-mid, return-end
+        private const int S = 96;           // texture resolution
+        private const int Display = 96;     // screen-pixel size of the cursor
+
+        // Per-frame durations: backswing → mid → IMPACT (lingers) → follow-thru → mid-return → backswing
         private static readonly float[] FrameTimes = { 0.07f, 0.05f, 0.10f, 0.06f, 0.05f, 0.07f };
 
         public State CurrentState
@@ -34,165 +40,188 @@ namespace DungKeeper
         private void Awake()
         {
             Instance = this;
+            Cursor.visible = false; // hide the OS cursor entirely
+
             _pointTex   = BuildPoint();
             _canSlapTex = BuildCanSlap();
 
-            // Six frames: hand sweeps right→left (back-of-hand→palm) then left→right (palm→back)
-            // xOff is the left edge of the hand within the 64×64 frame
-            var farRight  = BuildSlapFrame(xOff: 22, C.Back,    knuckles: true,  flash: false);
-            var midRight  = BuildSlapFrame(xOff: 14, C.BackMid, knuckles: true,  flash: false);
-            var impact    = BuildSlapFrame(xOff:  6, C.Palm,    knuckles: false, flash: true);
-            var followThru= BuildSlapFrame(xOff:  0, C.Palm,    knuckles: false, flash: false);
+            // Six frames: hand sweeps RIGHT → LEFT (dark back-of-hand → light palm),
+            // then LEFT → RIGHT (light palm → dark back-of-hand) to complete the slap cycle
+            var farRight   = BuildSlapFrame(xOff: 32, Col.Back,    knuckles: true,  flash: false);
+            var midRight   = BuildSlapFrame(xOff: 20, Col.BackMid, knuckles: true,  flash: false);
+            var impact     = BuildSlapFrame(xOff:  8, Col.Palm,    knuckles: false, flash: true);
+            var followThru = BuildSlapFrame(xOff:  0, Col.Palm,    knuckles: false, flash: false);
 
-            // Symmetric: right → right-mid → IMPACT → follow-through → right-mid → right
             _slapFrames = new[] { farRight, midRight, impact, followThru, midRight, farRight };
+
+            CreateUICursor();
             Apply();
+        }
+
+        private void CreateUICursor()
+        {
+            var canvasGo = new GameObject("CursorCanvas");
+            canvasGo.transform.SetParent(transform);
+            var canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 32767; // on top of everything
+
+            var imgGo = new GameObject("CursorImg");
+            imgGo.transform.SetParent(canvasGo.transform, false);
+            _cursorImg = imgGo.AddComponent<RawImage>();
+            _cursorImg.raycastTarget = false; // don't block game clicks
+            _cursorImg.color = Color.white;
+
+            _cursorRect = _cursorImg.rectTransform;
+            _cursorRect.anchorMin = _cursorRect.anchorMax = Vector2.zero;
+            _cursorRect.pivot = new Vector2(0f, 1f); // top-left corner tracks mouse
+            _cursorRect.sizeDelta = new Vector2(Display, Display);
         }
 
         private void Update()
         {
+            // Cursor follows mouse every frame
+            _cursorRect.position = Input.mousePosition;
+
             if (_state != State.Slapping) return;
             _frameTimer += Time.deltaTime;
             float threshold = FrameTimes[_slapFrame % FrameTimes.Length];
             if (_frameTimer < threshold) return;
             _frameTimer -= threshold;
             _slapFrame = (_slapFrame + 1) % _slapFrames.Length;
-            Cursor.SetCursor(_slapFrames[_slapFrame], SlapHotspot, CursorMode.ForceSoftware);
+            _cursorImg.texture = _slapFrames[_slapFrame];
         }
 
-        private void OnDestroy() =>
-            Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
-
-        // Hotspot sits at the fingertips of the impact frame (xOff=6, yOff=4 → tip at ~x9, y4)
-        private static readonly Vector2 SlapHotspot = new Vector2(9, 4);
+        private void OnDestroy()
+        {
+            Cursor.visible = true;
+        }
 
         private void Apply()
         {
             switch (_state)
             {
                 case State.Slapping:
-                    Cursor.SetCursor(_slapFrames[0], SlapHotspot, CursorMode.ForceSoftware);
+                    _cursorImg.texture = _slapFrames[0];
                     break;
                 case State.CanSlap:
-                    Cursor.SetCursor(_canSlapTex, new Vector2(20, 4), CursorMode.ForceSoftware);
+                    _cursorImg.texture = _canSlapTex;
                     break;
                 default:
-                    Cursor.SetCursor(_pointTex, new Vector2(10, 2), CursorMode.ForceSoftware);
+                    _cursorImg.texture = _pointTex;
                     break;
             }
         }
 
         // ── colors ────────────────────────────────────────────────────────
 
-        private static class C
+        private static class Col
         {
-            public static readonly Color32 Back    = new Color32(188, 138, 82, 255);  // dark back-of-hand
-            public static readonly Color32 BackMid = new Color32(214, 168, 112, 255); // mid-rotation
+            public static readonly Color32 Back    = new Color32(185, 135, 80,  255); // dark back-of-hand
+            public static readonly Color32 BackMid = new Color32(212, 165, 108, 255); // mid-rotation
             public static readonly Color32 Palm    = new Color32(240, 195, 145, 255); // light palm
-            public static readonly Color32 Knuckle = new Color32(152, 108, 56, 255);  // knuckle bumps
-            public static readonly Color32 Flash   = new Color32(255, 238, 55, 255);  // impact flash
-            public static readonly Color32 Nail    = new Color32(255, 230, 210, 255);
+            public static readonly Color32 Knuckle = new Color32(150, 105, 52,  255);
+            public static readonly Color32 Flash   = new Color32(255, 238, 50,  255);
+            public static readonly Color32 Nail    = new Color32(255, 228, 205, 255);
         }
 
         // ── texture builders ──────────────────────────────────────────────
 
         private static Texture2D BuildPoint()
         {
-            // 64×64 pointing finger
-            const int S = 64;
             var px = Blank(S);
-            // Index finger extended
-            Rect(px, S, 18, 0, 10, 36, C.Palm);
-            Rect(px, S, 20, 0, 6,  6,  C.Nail);
-            // Curled fingers
-            Rect(px, S, 28, 14, 10, 26, C.Palm);
-            Rect(px, S, 38, 18, 10, 22, C.Palm);
-            Rect(px, S, 48, 22, 8,  18, C.Palm);
+            // Index finger extended upward
+            Rect(px, S, 27, 0,  14, 54, Col.Palm);
+            Rect(px, S, 29, 0,  10,  8, Col.Nail); // nail
+            // Curled fingers (middle, ring, pinky)
+            Rect(px, S, 41, 21, 14, 39, Col.Palm);
+            Rect(px, S, 55, 27, 14, 33, Col.Palm);
+            Rect(px, S, 69, 33, 12, 27, Col.Palm);
             // Palm
-            Rect(px, S, 14, 36, 42, 20, C.Palm);
+            Rect(px, S, 21, 54, 63, 30, Col.Palm);
             // Thumb
-            Rect(px, S, 6,  42, 16, 14, C.Palm);
+            Rect(px, S,  9, 63, 24, 21, Col.Palm);
             return Bake(px, S);
         }
 
         private static Texture2D BuildCanSlap()
         {
-            // 64×64 open palm (hover — no flash)
-            const int S = 64;
             var px = Blank(S);
-            DrawOpenHand(px, S, xOff: 6, yOff: 4, skin: C.Palm, knuckles: false, flash: false);
+            DrawOpenHand(px, S, xOff: 8, skin: Col.Palm, knuckles: false, flash: false);
             return Bake(px, S);
         }
 
-        // All six slap animation frames share the same hand shape; only xOff and colors differ
         private static Texture2D BuildSlapFrame(int xOff, Color32 skin, bool knuckles, bool flash)
         {
-            const int S = 64;
             var px = Blank(S);
-            DrawOpenHand(px, S, xOff, yOff: 4, skin, knuckles, flash);
+            DrawOpenHand(px, S, xOff, skin, knuckles, flash);
             return Bake(px, S);
         }
 
-        // Draw an open hand (fingers pointing down) at the given offset within the texture
-        private static void DrawOpenHand(Color32[] px, int S, int xOff, int yOff,
-                                         Color32 skin, bool knuckles, bool flash)
+        // Open hand with fingers pointing down. xOff shifts the whole hand horizontally
+        // to simulate the lateral sweep of the slap.
+        private static void DrawOpenHand(Color32[] px, int S, int xOff, Color32 skin,
+                                         bool knuckles, bool flash)
         {
-            // Five fingers (lengths vary: pinky shortest, middle tallest)
-            Rect(px, S, xOff +  0, yOff,      6, 22, skin); // pinky
-            Rect(px, S, xOff +  8, yOff,      6, 26, skin); // ring
-            Rect(px, S, xOff + 16, yOff,      6, 30, skin); // middle
-            Rect(px, S, xOff + 24, yOff,      6, 26, skin); // index
-            Rect(px, S, xOff + 32, yOff +  6, 6, 18, skin); // thumb
+            const int yOff = 6;
+
+            // Fingers (varying heights; middle is tallest)
+            Rect(px, S, xOff +  0, yOff,      9, 33, skin); // pinky
+            Rect(px, S, xOff + 12, yOff,      9, 39, skin); // ring
+            Rect(px, S, xOff + 24, yOff,      9, 45, skin); // middle
+            Rect(px, S, xOff + 36, yOff,      9, 39, skin); // index
+            Rect(px, S, xOff + 48, yOff +  9, 9, 27, skin); // thumb
             // Palm
-            Rect(px, S, xOff,      yOff + 22, 40, 16, skin);
+            Rect(px, S, xOff,      yOff + 33, 60, 24, skin);
 
             if (knuckles)
             {
-                // Knuckle ridge where fingers join palm
-                Rect(px, S, xOff +  0, yOff + 20, 5, 2, C.Knuckle);
-                Rect(px, S, xOff +  8, yOff + 20, 5, 2, C.Knuckle);
-                Rect(px, S, xOff + 16, yOff + 20, 5, 2, C.Knuckle);
-                Rect(px, S, xOff + 24, yOff + 20, 5, 2, C.Knuckle);
+                // Knuckle ridge at finger-palm junction
+                Rect(px, S, xOff +  0, yOff + 30, 8, 3, Col.Knuckle);
+                Rect(px, S, xOff + 12, yOff + 30, 8, 3, Col.Knuckle);
+                Rect(px, S, xOff + 24, yOff + 30, 8, 3, Col.Knuckle);
+                Rect(px, S, xOff + 36, yOff + 30, 8, 3, Col.Knuckle);
                 // Mid-finger knuckle joints
-                Rect(px, S, xOff +  0, yOff + 11, 4, 1, C.Knuckle);
-                Rect(px, S, xOff +  8, yOff + 13, 4, 1, C.Knuckle);
-                Rect(px, S, xOff + 16, yOff + 15, 4, 1, C.Knuckle);
-                Rect(px, S, xOff + 24, yOff + 13, 4, 1, C.Knuckle);
+                Rect(px, S, xOff +  0, yOff + 16, 7, 2, Col.Knuckle);
+                Rect(px, S, xOff + 12, yOff + 19, 7, 2, Col.Knuckle);
+                Rect(px, S, xOff + 24, yOff + 22, 7, 2, Col.Knuckle);
+                Rect(px, S, xOff + 36, yOff + 19, 7, 2, Col.Knuckle);
             }
 
             if (flash)
             {
-                // Yellow impact flash on fingertips
-                Rect(px, S, xOff +  0, yOff, 6, 6, C.Flash);
-                Rect(px, S, xOff +  8, yOff, 6, 6, C.Flash);
-                Rect(px, S, xOff + 16, yOff, 6, 6, C.Flash);
-                Rect(px, S, xOff + 24, yOff, 6, 6, C.Flash);
+                // Yellow impact burst at fingertips
+                Rect(px, S, xOff +  0, yOff, 9, 9, Col.Flash);
+                Rect(px, S, xOff + 12, yOff, 9, 9, Col.Flash);
+                Rect(px, S, xOff + 24, yOff, 9, 9, Col.Flash);
+                Rect(px, S, xOff + 36, yOff, 9, 9, Col.Flash);
             }
         }
 
         // ── helpers ───────────────────────────────────────────────────────
 
-        private static Color32[] Blank(int S)
+        private static Color32[] Blank(int size)
         {
-            var px = new Color32[S * S];
+            var px = new Color32[size * size];
             for (int i = 0; i < px.Length; i++) px[i] = new Color32(0, 0, 0, 0);
             return px;
         }
 
-        // y=0 = top of cursor visually; texture origin is bottom-left, so flip y
-        private static void Rect(Color32[] px, int S, int x, int y, int w, int h, Color32 c)
+        // y=0 = top of cursor visually; Unity textures are bottom-left origin, so flip y.
+        // cols outside [0, S) are silently clipped so off-edge hands look natural.
+        private static void Rect(Color32[] px, int size, int x, int y, int w, int h, Color32 c)
         {
-            for (int row = y; row < y + h && row < S; row++)
-                for (int col = x; col < x + w && col < S; col++)
+            for (int row = y; row < y + h && row < size; row++)
+                for (int col = x; col < x + w; col++)
                 {
-                    if (col < 0 || col >= S) continue; // allow partial off-edge hands
-                    px[(S - 1 - row) * S + col] = c;
+                    if (col < 0 || col >= size) continue;
+                    px[(size - 1 - row) * size + col] = c;
                 }
         }
 
-        private static Texture2D Bake(Color32[] px, int S)
+        private static Texture2D Bake(Color32[] px, int size)
         {
-            var tex = new Texture2D(S, S, TextureFormat.RGBA32, false)
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
                 { filterMode = FilterMode.Point };
             tex.SetPixels32(px);
             tex.Apply();
