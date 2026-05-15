@@ -2,76 +2,117 @@ using UnityEngine;
 
 namespace DungKeeper
 {
-    /// <summary>
-    /// Draws an evil-hand cursor using GL/GUI lines.
-    /// Switches between Hover, CanSlap, and Slapping states.
-    /// Replace the procedural drawing with real texture assets when available.
-    /// </summary>
     public class DungeonCursor : MonoBehaviour
     {
-        public enum CursorState { Hover, CanSlap, Slapping }
+        public enum State { Point, CanSlap, Slapping }
 
         public static DungeonCursor Instance { get; private set; }
-        public CursorState State { get; set; } = CursorState.Hover;
 
-        private Camera cam;
-        private static readonly Color HandColor    = new Color(0.85f, 0.70f, 0.55f);
-        private static readonly Color SlapColor    = new Color(1.00f, 0.25f, 0.10f);
-        private static readonly Color OutlineColor = new Color(0.10f, 0.05f, 0.00f);
+        private State _state;
+        private Texture2D _pointTex;
+        private Texture2D _slapTex;
+
+        public State CurrentState
+        {
+            get => _state;
+            set { if (_state != value) { _state = value; Apply(); } }
+        }
 
         private void Awake()
         {
             Instance = this;
-            Cursor.visible = false;
+            _pointTex = BuildPoint();
+            _slapTex  = BuildSlap();
+            Apply();
         }
 
-        private void Start() => cam = Camera.main;
+        private void OnDestroy() =>
+            Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
 
-        private void OnDestroy() => Cursor.visible = true;
-
-        private void OnGUI()
+        private void Apply()
         {
-            var mp = new Vector2(Input.mousePosition.x,
-                                 Screen.height - Input.mousePosition.y);
-
-            Color fill    = State == CursorState.Slapping ? SlapColor : HandColor;
-            float angle   = State == CursorState.Slapping ? -35f : 0f;
-            float slapOff = State == CursorState.Slapping ? 8f  : 0f;
-
-            var matrix = GUI.matrix;
-            GUIUtility.RotateAroundPivot(angle, mp);
-
-            DrawHand(mp + Vector2.up * slapOff, fill, OutlineColor);
-
-            GUI.matrix = matrix;
+            if (_state == State.Slapping)
+                Cursor.SetCursor(_slapTex, new Vector2(16, 16), CursorMode.Auto);
+            else
+                Cursor.SetCursor(_pointTex, new Vector2(10, 2), CursorMode.Auto);
         }
 
-        private static void DrawHand(Vector2 o, Color fill, Color outline)
+        // ── texture builders ──────────────────────────────────────────────
+
+        private static Texture2D BuildPoint()
         {
-            // Palm
-            DrawRect(o + new Vector2(-9,  0), 18, 16, fill, outline);
+            // 32x32 pointing-hand cursor (index finger up)
+            const int S = 32;
+            var skin  = new Color32(240, 195, 145, 255);
+            var nail  = new Color32(255, 230, 210, 255);
+            var px    = Blank(S);
 
-            // Thumb
-            DrawRect(o + new Vector2(-13, -6),  7, 10, fill, outline);
+            // index finger — columns 9-13, rows 0-17
+            Rect(px, S, 9, 0, 5, 18, skin);
+            Rect(px, S, 10, 0, 3, 3, nail);        // nail
 
-            // Fingers
-            DrawRect(o + new Vector2(-8, -16),  5, 16, fill, outline);
-            DrawRect(o + new Vector2(-3, -18),  5, 18, fill, outline);
-            DrawRect(o + new Vector2( 2, -17),  5, 17, fill, outline);
-            DrawRect(o + new Vector2( 7, -13),  5, 13, fill, outline);
+            // middle finger curled — cols 14-18, rows 7-19
+            Rect(px, S, 14, 7, 5, 13, skin);
+
+            // ring finger curled — cols 19-23, rows 9-19
+            Rect(px, S, 19, 9, 5, 11, skin);
+
+            // pinky curled — cols 24-27, rows 11-19
+            Rect(px, S, 24, 11, 4, 9, skin);
+
+            // palm — cols 7-27, rows 18-28
+            Rect(px, S, 7, 18, 21, 10, skin);
+
+            // thumb — cols 3-10, rows 21-27
+            Rect(px, S, 3, 21, 8, 7, skin);
+
+            return Bake(px, S);
         }
 
-        private static void DrawRect(Vector2 pos, float w, float h, Color fill, Color outline)
+        private static Texture2D BuildSlap()
         {
-            var r = new Rect(pos.x, pos.y - h, w, h);
-            GUI.color = fill;
-            GUI.DrawTexture(r, Texture2D.whiteTexture);
-            GUI.color = outline;
-            GUI.DrawTexture(new Rect(r.x - 1,      r.y - 1,      r.width + 2, 1),           Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(r.x - 1,      r.y + r.height, r.width + 2, 1),         Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(r.x - 1,      r.y - 1,      1,           r.height + 2), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(r.x + r.width, r.y - 1,     1,           r.height + 2), Texture2D.whiteTexture);
-            GUI.color = Color.white;
+            // 32x32 open-palm slap cursor (hand flat, fingers spread down)
+            const int S = 32;
+            var skin = new Color32(240, 195, 145, 255);
+            var px   = Blank(S);
+
+            // fingers (spread, pointing down from palm)
+            Rect(px, S, 1,  0, 4, 18, skin); // pinky
+            Rect(px, S, 6,  0, 4, 20, skin); // ring
+            Rect(px, S, 11, 0, 4, 22, skin); // middle
+            Rect(px, S, 16, 0, 4, 20, skin); // index
+            Rect(px, S, 21, 4, 4, 14, skin); // thumb
+
+            // palm
+            Rect(px, S, 1, 17, 24, 12, skin);
+
+            return Bake(px, S);
+        }
+
+        // ── helpers ───────────────────────────────────────────────────────
+
+        private static Color32[] Blank(int S)
+        {
+            var px = new Color32[S * S];
+            for (int i = 0; i < px.Length; i++) px[i] = new Color32(0, 0, 0, 0);
+            return px;
+        }
+
+        // y=0 = top of cursor visually; texture origin is bottom-left, so flip y
+        private static void Rect(Color32[] px, int S, int x, int y, int w, int h, Color32 c)
+        {
+            for (int row = y; row < y + h && row < S; row++)
+                for (int col = x; col < x + w && col < S; col++)
+                    px[(S - 1 - row) * S + col] = c;
+        }
+
+        private static Texture2D Bake(Color32[] px, int S)
+        {
+            var tex = new Texture2D(S, S, TextureFormat.RGBA32, false)
+                { filterMode = FilterMode.Point };
+            tex.SetPixels32(px);
+            tex.Apply();
+            return tex;
         }
     }
 }

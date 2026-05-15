@@ -19,11 +19,11 @@ namespace DungKeeper
             if (DungeonCursor.Instance != null)
             {
                 if (Input.GetMouseButton(0) && overCreature)
-                    DungeonCursor.Instance.State = DungeonCursor.CursorState.Slapping;
+                    DungeonCursor.Instance.CurrentState = DungeonCursor.State.Slapping;
                 else if (overCreature)
-                    DungeonCursor.Instance.State = DungeonCursor.CursorState.CanSlap;
+                    DungeonCursor.Instance.CurrentState = DungeonCursor.State.CanSlap;
                 else
-                    DungeonCursor.Instance.State = DungeonCursor.CursorState.Hover;
+                    DungeonCursor.Instance.CurrentState = DungeonCursor.State.Point;
             }
 
             if (Input.GetMouseButtonDown(0) && overCreature)
