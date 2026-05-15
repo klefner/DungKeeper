@@ -21,8 +21,10 @@ namespace DungKeeper
         private const int S = 96;           // texture resolution
         private const int Display = 96;     // screen-pixel size of the cursor
 
-        // Per-frame durations: backswing → mid → IMPACT (lingers) → follow-thru → mid-return → backswing
-        private static readonly float[] FrameTimes = { 0.07f, 0.05f, 0.10f, 0.06f, 0.05f, 0.07f };
+        // Per-frame durations (slow enough to see each pose): backswing → mid → IMPACT → follow-thru → mid → return
+        private static readonly float[] FrameTimes = { 0.12f, 0.10f, 0.18f, 0.10f, 0.10f, 0.12f };
+
+        public bool IsSlapping => _state == State.Slapping;
 
         public State CurrentState
         {
@@ -78,6 +80,15 @@ namespace DungKeeper
             _cursorRect.sizeDelta = new Vector2(Display, Display);
         }
 
+        // Fire once per click — plays the full cycle then returns to idle automatically
+        public void TriggerSlap()
+        {
+            _state = State.Slapping;
+            _slapFrame = 0;
+            _frameTimer = 0f;
+            _cursorImg.texture = _slapFrames[0];
+        }
+
         private void Update()
         {
             // Cursor follows mouse every frame
@@ -85,10 +96,17 @@ namespace DungKeeper
 
             if (_state != State.Slapping) return;
             _frameTimer += Time.deltaTime;
-            float threshold = FrameTimes[_slapFrame % FrameTimes.Length];
+            float threshold = FrameTimes[_slapFrame];
             if (_frameTimer < threshold) return;
             _frameTimer -= threshold;
-            _slapFrame = (_slapFrame + 1) % _slapFrames.Length;
+            _slapFrame++;
+            if (_slapFrame >= _slapFrames.Length)
+            {
+                // One cycle complete — return to idle
+                _state = State.Point;
+                _cursorImg.texture = _pointTex;
+                return;
+            }
             _cursorImg.texture = _slapFrames[_slapFrame];
         }
 
