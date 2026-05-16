@@ -53,6 +53,11 @@ namespace DungKeeper
             _handGroup.localRotation = Quaternion.identity;
 
             BuildHand();
+
+            // Karate-chop / backhand orientation: fingers point right (+X world),
+            // thumb points up (+Y world), pinky edge faces the floor (-Y world).
+            _handGroup.localRotation = Quaternion.Euler(0f, 0f, 90f);
+
             SetupHandCamera();
             StartCoroutine(IdleWiggle());
         }
@@ -70,7 +75,8 @@ namespace DungKeeper
             var ray   = cam.ScreenPointToRay(Input.mousePosition);
             var plane = new Plane(Vector3.up, Vector3.zero);
             if (plane.Raycast(ray, out float dist))
-                _anchor.position = ray.GetPoint(dist) + Vector3.up * 2.0f;
+                // Shift anchor left so fingertips (not palm) sit at cursor world position
+                _anchor.position = ray.GetPoint(dist) + Vector3.up * 2.0f + Vector3.left * 0.9f;
         }
 
         private void SyncHandCamera()
@@ -245,7 +251,8 @@ namespace DungKeeper
                         if (_proximal[i] == null) continue;
                         float angle = Mathf.Sin(now * speed[i] + phase[i]) * amp[i];
                         var e = _proximal[i].localEulerAngles;
-                        _proximal[i].localEulerAngles = new Vector3(angle, e.y, e.z);
+                        // Rotate around local Z — correct curl axis now fingers point right
+                        _proximal[i].localEulerAngles = new Vector3(e.x, e.y, angle);
                     }
                 }
                 yield return null;
@@ -256,42 +263,45 @@ namespace DungKeeper
         {
             IsSlapping = true;
             var restPos = _handGroup.localPosition;
-            var restRot = _handGroup.localRotation;
+            // Base orientation: fingers right, thumb up, pinky toward floor.
 
-            // ── 1. Wind-up: hand rises and tilts back ─────────────────────
-            for (float t = 0; t < 1f; t += Time.deltaTime / 0.13f)
+            // ── 1. Wind-up: pull left, wrist tilts back (Y+) ──────────────
+            for (float t = 0; t < 1f; t += Time.deltaTime / 0.14f)
             {
                 float e = Mathf.SmoothStep(0, 1, t);
-                _handGroup.localPosition    = restPos + Vector3.up * Mathf.Lerp(0, 0.40f, e);
-                _handGroup.localEulerAngles = new Vector3(Mathf.Lerp(0, -30f, e), 0, 0);
+                _handGroup.localPosition    = restPos + Vector3.left * Mathf.Lerp(0, 0.32f, e);
+                // Rotate around Y so wrist leads left, fingertips angle back-right
+                _handGroup.localEulerAngles = new Vector3(0, Mathf.Lerp(0, 22f, e), 90);
                 yield return null;
             }
 
-            // ── 2. Slam down: accelerates toward the floor ────────────────
+            // ── 2. Sweep right: fingertips arc farther than wrist ─────────
             var windupPos = _handGroup.localPosition;
-            for (float t = 0; t < 1f; t += Time.deltaTime / 0.09f)
+            for (float t = 0; t < 1f; t += Time.deltaTime / 0.08f)
             {
-                float e = Mathf.Pow(t, 0.35f); // very fast initial acceleration
-                _handGroup.localPosition    = windupPos + Vector3.down * Mathf.Lerp(0, 0.90f, e);
-                _handGroup.localEulerAngles = new Vector3(Mathf.Lerp(-30f, 20f, t), 0, 0);
+                float e = Mathf.Pow(t, 0.35f); // fast initial burst
+                _handGroup.localPosition    = windupPos + Vector3.right * Mathf.Lerp(0, 0.80f, e);
+                // Y angle flips: wrist trails then follows through past centre
+                float yAngle = Mathf.Lerp(22f, -18f, t);
+                _handGroup.localEulerAngles = new Vector3(0, yAngle, 90);
                 yield return null;
             }
 
             // ── 3. Hold at impact ─────────────────────────────────────────
-            yield return new WaitForSeconds(0.10f);
+            yield return new WaitForSeconds(0.08f);
 
-            // ── 4. Rise back to rest position ─────────────────────────────
+            // ── 4. Drift back to idle ─────────────────────────────────────
             var impactPos = _handGroup.localPosition;
-            for (float t = 0; t < 1f; t += Time.deltaTime / 0.22f)
+            for (float t = 0; t < 1f; t += Time.deltaTime / 0.24f)
             {
                 float e = Mathf.SmoothStep(0, 1, t);
                 _handGroup.localPosition    = Vector3.Lerp(impactPos, restPos, e);
-                _handGroup.localEulerAngles = new Vector3(Mathf.Lerp(20f, 0f, e), 0, 0);
+                _handGroup.localEulerAngles = new Vector3(0, Mathf.Lerp(-18f, 0f, e), 90);
                 yield return null;
             }
 
-            _handGroup.localPosition = restPos;
-            _handGroup.localRotation = restRot;
+            _handGroup.localPosition    = restPos;
+            _handGroup.localEulerAngles = new Vector3(0, 0, 90);
 
             IsSlapping = false;
             _state = State.Point;
