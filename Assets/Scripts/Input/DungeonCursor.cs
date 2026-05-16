@@ -97,8 +97,10 @@ namespace DungKeeper
             var mat = MakeSkinMaterial();
 
             // ── Palm ──────────────────────────────────────────────────────
-            Capsule("Palm", _handGroup, Vector3.zero,
-                new Vector3(1.10f, 0.16f, 0.78f), mat);
+            // Shift palm right in local Y (= world +X) so fingers attach at its left edge,
+            // not its centre. Wider local-Y scale makes the palm body clearly visible.
+            Capsule("Palm", _handGroup, new Vector3(0f, 0.38f, 0f),
+                new Vector3(1.10f, 0.55f, 0.82f), mat);
 
             // ── Four fingers (pinky → index) ──────────────────────────────
             // x positions, relative finger lengths, names
