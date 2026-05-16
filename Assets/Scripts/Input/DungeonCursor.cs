@@ -54,9 +54,9 @@ namespace DungKeeper
 
             BuildHand();
 
-            // Karate-chop / backhand orientation: fingers point right (+X world),
+            // Karate-chop / backhand orientation: fingers point left (-X world),
             // thumb points up (+Y world), pinky edge faces the floor (-Y world).
-            _handGroup.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            _handGroup.localRotation = Quaternion.Euler(0f, 180f, 90f);
 
             SetupHandCamera();
             StartCoroutine(IdleWiggle());
@@ -75,8 +75,8 @@ namespace DungKeeper
             var ray   = cam.ScreenPointToRay(Input.mousePosition);
             var plane = new Plane(Vector3.up, Vector3.zero);
             if (plane.Raycast(ray, out float dist))
-                // Shift anchor left so fingertips (not palm) sit at cursor world position
-                _anchor.position = ray.GetPoint(dist) + Vector3.up * 2.0f + Vector3.left * 0.9f;
+                // Shift anchor right so fingertips (not palm) sit at cursor world position
+                _anchor.position = ray.GetPoint(dist) + Vector3.up * 2.0f + Vector3.right * 0.9f;
         }
 
         private void SyncHandCamera()
@@ -265,24 +265,24 @@ namespace DungKeeper
             var restPos = _handGroup.localPosition;
             // Base orientation: fingers right, thumb up, pinky toward floor.
 
-            // ── 1. Wind-up: pull left, wrist tilts back (Y+) ──────────────
+            float baseY = _handGroup.localEulerAngles.y; // 180 for left-pointing hand
+
+            // ── 1. Wind-up: pull right, wrist tilts back ──────────────────
             for (float t = 0; t < 1f; t += Time.deltaTime / 0.14f)
             {
                 float e = Mathf.SmoothStep(0, 1, t);
-                _handGroup.localPosition    = restPos + Vector3.left * Mathf.Lerp(0, 0.32f, e);
-                // Rotate around Y so wrist leads left, fingertips angle back-right
-                _handGroup.localEulerAngles = new Vector3(0, Mathf.Lerp(0, 22f, e), 90);
+                _handGroup.localPosition    = restPos + Vector3.right * Mathf.Lerp(0, 0.32f, e);
+                _handGroup.localEulerAngles = new Vector3(0, baseY + Mathf.Lerp(0, -22f, e), 90);
                 yield return null;
             }
 
-            // ── 2. Sweep right: fingertips arc farther than wrist ─────────
+            // ── 2. Sweep left: fingertips arc farther than wrist ──────────
             var windupPos = _handGroup.localPosition;
             for (float t = 0; t < 1f; t += Time.deltaTime / 0.08f)
             {
                 float e = Mathf.Pow(t, 0.35f); // fast initial burst
-                _handGroup.localPosition    = windupPos + Vector3.right * Mathf.Lerp(0, 0.80f, e);
-                // Y angle flips: wrist trails then follows through past centre
-                float yAngle = Mathf.Lerp(22f, -18f, t);
+                _handGroup.localPosition    = windupPos + Vector3.left * Mathf.Lerp(0, 0.80f, e);
+                float yAngle = baseY + Mathf.Lerp(-22f, 18f, t);
                 _handGroup.localEulerAngles = new Vector3(0, yAngle, 90);
                 yield return null;
             }
@@ -296,12 +296,12 @@ namespace DungKeeper
             {
                 float e = Mathf.SmoothStep(0, 1, t);
                 _handGroup.localPosition    = Vector3.Lerp(impactPos, restPos, e);
-                _handGroup.localEulerAngles = new Vector3(0, Mathf.Lerp(-18f, 0f, e), 90);
+                _handGroup.localEulerAngles = new Vector3(0, baseY + Mathf.Lerp(18f, 0f, e), 90);
                 yield return null;
             }
 
             _handGroup.localPosition    = restPos;
-            _handGroup.localEulerAngles = new Vector3(0, 0, 90);
+            _handGroup.localEulerAngles = new Vector3(0, baseY, 90);
 
             IsSlapping = false;
             _state = State.Point;
